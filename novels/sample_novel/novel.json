@@ -1,0 +1,9 @@
+{
+  "title": "魔法の世界の冒険",
+  "author": "サンプル作者",
+  "description": "現代の高校生が異世界に転生し、魔法を学びながら冒険する物語",
+  "settingsDirectories": ["settings", "docs"],
+  "contentDirectories": ["contents", "chapters"],
+  "createdAt": "2024-03-14T00:00:00Z",
+  "updatedAt": "2024-03-14T00:00:00Z"
+} 

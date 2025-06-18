@@ -1,0 +1,9 @@
+{
+  "title": "消えた図書館の謎",
+  "author": "推理作家",
+  "description": "古い図書館で起こる不可解な事件を探偵が解決するミステリー小説",
+  "settingsDirectories": ["docs", "character_profiles"],
+  "contentDirectories": ["manuscript"],
+  "createdAt": "2024-03-14T00:00:00Z",
+  "updatedAt": "2024-03-14T00:00:00Z"
+} 
