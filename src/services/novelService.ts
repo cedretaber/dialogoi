@@ -71,6 +71,61 @@ export class NovelService {
     return files;
   }
 
+  // ファイル内からキーワードを検索する共通メソッド
+  private async searchFiles(
+    novelId: string, 
+    keyword: string, 
+    directories: string[], 
+    extensions: string[]
+  ): Promise<Array<{filename: string, matchingLines: string[]}>> {
+    await this.discoverNovelProjects();
+    
+    const project = this.novelProjects.get(novelId);
+    if (!project) {
+      throw new Error(`Novel project '${novelId}' not found`);
+    }
+    
+    const searchResults: Array<{filename: string, matchingLines: string[]}> = [];
+    
+    // 指定されたディレクトリから全ファイルを検索
+    for (const directory of directories) {
+      const fullDirectoryPath = path.join(project.path, directory);
+      const files = await this.findFilesRecursively(fullDirectoryPath, extensions);
+      
+      for (const filePath of files) {
+        try {
+          const data = await fs.readFile(filePath, 'utf-8');
+          const lines = data.split('\n');
+          const matchingLines: string[] = [];
+          
+          // キーワードを含む行を検索（大文字小文字を区別しない）
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i].toLowerCase().includes(keyword.toLowerCase())) {
+              // マッチした行とその前後の文脈を含める
+              const contextStart = Math.max(0, i - 1);
+              const contextEnd = Math.min(lines.length - 1, i + 1);
+              const contextLines = lines.slice(contextStart, contextEnd + 1);
+              matchingLines.push(`行${i + 1}: ${contextLines.join('\n')}`);
+            }
+          }
+          
+          if (matchingLines.length > 0) {
+            const relativePath = path.relative(project.path, filePath);
+            searchResults.push({
+              filename: relativePath,
+              matchingLines: matchingLines
+            });
+          }
+        } catch (error) {
+          // このファイルが読めない場合はスキップ
+          continue;
+        }
+      }
+    }
+    
+    return searchResults;
+  }
+
   // 小説プロジェクト一覧を取得
   async listNovelProjects(): Promise<Array<{id: string, title: string, description?: string}>> {
     await this.discoverNovelProjects();
@@ -180,45 +235,7 @@ export class NovelService {
     }
     
     const extensions = ['md', 'txt'];
-    const searchResults: Array<{filename: string, matchingLines: string[]}> = [];
-    
-    // 設定ディレクトリから全ファイルを検索
-    for (const settingsDir of project.config.settingsDirectories) {
-      const fullSettingsPath = path.join(project.path, settingsDir);
-      const files = await this.findFilesRecursively(fullSettingsPath, extensions);
-      
-      for (const filePath of files) {
-        try {
-          const data = await fs.readFile(filePath, 'utf-8');
-          const lines = data.split('\n');
-          const matchingLines: string[] = [];
-          
-          // キーワードを含む行を検索（大文字小文字を区別しない）
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i].toLowerCase().includes(keyword.toLowerCase())) {
-              // マッチした行とその前後の文脈を含める
-              const contextStart = Math.max(0, i - 1);
-              const contextEnd = Math.min(lines.length - 1, i + 1);
-              const contextLines = lines.slice(contextStart, contextEnd + 1);
-              matchingLines.push(`行${i + 1}: ${contextLines.join('\n')}`);
-            }
-          }
-          
-          if (matchingLines.length > 0) {
-            const relativePath = path.relative(project.path, filePath);
-            searchResults.push({
-              filename: relativePath,
-              matchingLines: matchingLines
-            });
-          }
-        } catch (error) {
-          // このファイルが読めない場合はスキップ
-          continue;
-        }
-      }
-    }
-    
-    return searchResults;
+    return this.searchFiles(novelId, keyword, project.config.settingsDirectories, extensions);
   }
 
   async searchNovelContent(novelId: string, keyword: string): Promise<Array<{filename: string, matchingLines: string[]}>> {
@@ -230,45 +247,7 @@ export class NovelService {
     }
     
     const extensions = ['txt', 'md'];
-    const searchResults: Array<{filename: string, matchingLines: string[]}> = [];
-    
-    // 本文ディレクトリから全ファイルを検索
-    for (const contentDir of project.config.contentDirectories) {
-      const fullContentPath = path.join(project.path, contentDir);
-      const files = await this.findFilesRecursively(fullContentPath, extensions);
-      
-      for (const filePath of files) {
-        try {
-          const data = await fs.readFile(filePath, 'utf-8');
-          const lines = data.split('\n');
-          const matchingLines: string[] = [];
-          
-          // キーワードを含む行を検索（大文字小文字を区別しない）
-          for (let i = 0; i < lines.length; i++) {
-            if (lines[i].toLowerCase().includes(keyword.toLowerCase())) {
-              // マッチした行とその前後の文脈を含める
-              const contextStart = Math.max(0, i - 1);
-              const contextEnd = Math.min(lines.length - 1, i + 1);
-              const contextLines = lines.slice(contextStart, contextEnd + 1);
-              matchingLines.push(`行${i + 1}: ${contextLines.join('\n')}`);
-            }
-          }
-          
-          if (matchingLines.length > 0) {
-            const relativePath = path.relative(project.path, filePath);
-            searchResults.push({
-              filename: relativePath,
-              matchingLines: matchingLines
-            });
-          }
-        } catch (error) {
-          // このファイルが読めない場合はスキップ
-          continue;
-        }
-      }
-    }
-    
-    return searchResults;
+    return this.searchFiles(novelId, keyword, project.config.contentDirectories, extensions);
   }
 
   async getNovelContent(novelId: string, filename?: string): Promise<string> {
