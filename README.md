@@ -220,3 +220,4 @@ npm test
 ## ライセンス
 
 MIT License
+ 

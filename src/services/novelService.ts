@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { MCPRequest, MCPResponse, NovelConfig, NovelProject } from '../types/novel';
+import { NovelConfig, NovelProject } from '../types/novel';
+import { fileExists, readFileWithPreview, findFilesRecursively, ensureDirectory } from '../utils/fileUtils';
 
 export class NovelService {
   private readonly baseDir: string;
@@ -43,34 +44,6 @@ export class NovelService {
     }
   }
 
-  // 指定ディレクトリ内のファイルを再帰的に検索
-  private async findFilesRecursively(dirPath: string, extensions: string[]): Promise<string[]> {
-    const files: string[] = [];
-    
-    try {
-      const entries = await fs.readdir(dirPath, { withFileTypes: true });
-      
-      for (const entry of entries) {
-        const fullPath = path.join(dirPath, entry.name);
-        
-        if (entry.isDirectory()) {
-          // サブディレクトリも検索
-          const subFiles = await this.findFilesRecursively(fullPath, extensions);
-          files.push(...subFiles);
-        } else if (entry.isFile()) {
-          const ext = path.extname(entry.name).slice(1);
-          if (extensions.includes(ext)) {
-            files.push(fullPath);
-          }
-        }
-      }
-    } catch (error) {
-      // ディレクトリが存在しない場合はスキップ
-    }
-    
-    return files;
-  }
-
   // ファイル内からキーワードを検索する共通メソッド
   private async searchFiles(
     novelId: string, 
@@ -78,19 +51,14 @@ export class NovelService {
     directories: string[], 
     extensions: string[]
   ): Promise<Array<{filename: string, matchingLines: string[]}>> {
-    await this.discoverNovelProjects();
-    
-    const project = this.novelProjects.get(novelId);
-    if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
-    }
+    const project = await this.getValidatedProject(novelId);
     
     const searchResults: Array<{filename: string, matchingLines: string[]}> = [];
     
     // 指定されたディレクトリから全ファイルを検索
     for (const directory of directories) {
       const fullDirectoryPath = path.join(project.path, directory);
-      const files = await this.findFilesRecursively(fullDirectoryPath, extensions);
+      const files = await findFilesRecursively(fullDirectoryPath, extensions);
       
       for (const filePath of files) {
         try {
@@ -144,49 +112,13 @@ export class NovelService {
   }
 
   async listNovelSettings(novelId: string): Promise<Array<{filename: string, preview: string}>> {
-    await this.discoverNovelProjects();
-    
-    const project = this.novelProjects.get(novelId);
-    if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
-    }
-    
+    const project = await this.getValidatedProject(novelId);
     const extensions = ['md', 'txt'];
-    const settingsFiles: Array<{filename: string, preview: string}> = [];
-    
-    // 設定ディレクトリから全ファイルを検索
-    for (const settingsDir of project.config.settingsDirectories) {
-      const fullSettingsPath = path.join(project.path, settingsDir);
-      const files = await this.findFilesRecursively(fullSettingsPath, extensions);
-      
-      for (const filePath of files) {
-        try {
-          const data = await fs.readFile(filePath, 'utf-8');
-          const lines = data.split('\n');
-          const preview = lines.slice(0, 3).join('\n');
-          const relativePath = path.relative(project.path, filePath);
-          
-          settingsFiles.push({
-            filename: relativePath,
-            preview: preview
-          });
-        } catch (error) {
-          // このファイルが読めない場合はスキップ
-          continue;
-        }
-      }
-    }
-    
-    return settingsFiles;
+    return this.listFilesInDirectories(project, project.config.settingsDirectories, extensions);
   }
 
   async getNovelSettings(novelId: string, filename?: string): Promise<string> {
-    await this.discoverNovelProjects();
-    
-    const project = this.novelProjects.get(novelId);
-    if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
-    }
+    const project = await this.getValidatedProject(novelId);
     
     if (filename) {
       // 特定のファイル名が指定された場合（プロジェクト相対パス）
@@ -204,7 +136,7 @@ export class NovelService {
       
       for (const settingsDir of project.config.settingsDirectories) {
         const fullSettingsPath = path.join(project.path, settingsDir);
-        const files = await this.findFilesRecursively(fullSettingsPath, extensions);
+        const files = await findFilesRecursively(fullSettingsPath, extensions);
         
         for (const filePath of files) {
           try {
@@ -227,36 +159,19 @@ export class NovelService {
   }
 
   async searchNovelSettings(novelId: string, keyword: string): Promise<Array<{filename: string, matchingLines: string[]}>> {
-    await this.discoverNovelProjects();
-    
-    const project = this.novelProjects.get(novelId);
-    if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
-    }
-    
+    const project = await this.getValidatedProject(novelId);
     const extensions = ['md', 'txt'];
     return this.searchFiles(novelId, keyword, project.config.settingsDirectories, extensions);
   }
 
   async searchNovelContent(novelId: string, keyword: string): Promise<Array<{filename: string, matchingLines: string[]}>> {
-    await this.discoverNovelProjects();
-    
-    const project = this.novelProjects.get(novelId);
-    if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
-    }
-    
+    const project = await this.getValidatedProject(novelId);
     const extensions = ['txt', 'md'];
     return this.searchFiles(novelId, keyword, project.config.contentDirectories, extensions);
   }
 
   async getNovelContent(novelId: string, filename?: string): Promise<string> {
-    await this.discoverNovelProjects();
-    
-    const project = this.novelProjects.get(novelId);
-    if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
-    }
+    const project = await this.getValidatedProject(novelId);
     
     if (filename) {
       // 特定のファイル名が指定された場合（プロジェクト相対パス）
@@ -274,7 +189,7 @@ export class NovelService {
       
       for (const contentDir of project.config.contentDirectories) {
         const fullContentPath = path.join(project.path, contentDir);
-        const files = await this.findFilesRecursively(fullContentPath, extensions);
+        const files = await findFilesRecursively(fullContentPath, extensions);
         
         // ファイル名でソート（章順序を保持）
         files.sort();
@@ -301,39 +216,9 @@ export class NovelService {
 
   // 本文ファイル一覧を取得
   async listNovelContent(novelId: string): Promise<Array<{filename: string, preview: string}>> {
-    await this.discoverNovelProjects();
-    
-    const project = this.novelProjects.get(novelId);
-    if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
-    }
-    
+    const project = await this.getValidatedProject(novelId);
     const extensions = ['txt', 'md'];
-    const contentFiles: Array<{filename: string, preview: string}> = [];
-    
-    // 本文ディレクトリから全ファイルを検索
-    for (const contentDir of project.config.contentDirectories) {
-      const fullContentPath = path.join(project.path, contentDir);
-      const files = await this.findFilesRecursively(fullContentPath, extensions);
-      
-      for (const filePath of files) {
-        try {
-          const data = await fs.readFile(filePath, 'utf-8');
-          const lines = data.split('\n');
-          const preview = lines.slice(0, 3).join('\n');
-          const relativePath = path.relative(project.path, filePath);
-          
-          contentFiles.push({
-            filename: relativePath,
-            preview: preview
-          });
-        } catch (error) {
-          // このファイルが読めない場合はスキップ
-          continue;
-        }
-      }
-    }
-    
+    const contentFiles = await this.listFilesInDirectories(project, project.config.contentDirectories, extensions);
     return contentFiles.sort((a, b) => a.filename.localeCompare(b.filename));
   }
 
@@ -377,12 +262,7 @@ export class NovelService {
 
   // 設定ファイルを追加
   async addNovelSetting(novelId: string, directory: string, filename: string, content: string, overwrite: boolean = false): Promise<void> {
-    await this.discoverNovelProjects();
-    
-    const project = this.novelProjects.get(novelId);
-    if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
-    }
+    const project = await this.getValidatedProject(novelId);
 
     // セキュリティチェック
     this.validateFileInput(filename, content);
@@ -397,19 +277,11 @@ export class NovelService {
     const filePath = path.join(targetDir, filename);
 
     // ディレクトリが存在しない場合は作成
-    await fs.mkdir(targetDir, { recursive: true });
+    await ensureDirectory(targetDir);
 
     // 既存ファイルのチェック
-    let fileExists = false;
-    try {
-      await fs.access(filePath);
-      fileExists = true;
-    } catch (accessError) {
-      // ファイルが存在しない場合は正常（新規作成）
-      fileExists = false;
-    }
-
-    if (fileExists && !overwrite) {
+    const exists = await fileExists(filePath);
+    if (exists && !overwrite) {
       throw new Error(`File '${filename}' already exists. Set overwrite=true to replace it.`);
     }
 
@@ -419,12 +291,7 @@ export class NovelService {
 
   // 本文ファイルを追加
   async addNovelContent(novelId: string, directory: string, filename: string, content: string, overwrite: boolean = false): Promise<void> {
-    await this.discoverNovelProjects();
-    
-    const project = this.novelProjects.get(novelId);
-    if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
-    }
+    const project = await this.getValidatedProject(novelId);
 
     // セキュリティチェック
     this.validateFileInput(filename, content);
@@ -442,16 +309,8 @@ export class NovelService {
     await fs.mkdir(targetDir, { recursive: true });
 
     // 既存ファイルのチェック
-    let fileExists = false;
-    try {
-      await fs.access(filePath);
-      fileExists = true;
-    } catch (accessError) {
-      // ファイルが存在しない場合は正常（新規作成）
-      fileExists = false;
-    }
-
-    if (fileExists && !overwrite) {
+    const exists = await this.fileExists(filePath);
+    if (exists && !overwrite) {
       throw new Error(`File '${filename}' already exists. Set overwrite=true to replace it.`);
     }
 
@@ -459,22 +318,74 @@ export class NovelService {
     await fs.writeFile(filePath, content, 'utf-8');
   }
 
-  async handleMCPRequest(request: MCPRequest): Promise<MCPResponse> {
-    try {
-      if (request.type === 'settings') {
-        const settings = await this.getNovelSettings(request.novelId);
-        return { success: true, data: settings };
-      } else if (request.type === 'content') {
-        // chapter パラメータは廃止、ファイル名を直接指定する形式に変更
-        const content = await this.getNovelContent(request.novelId);
-        return { success: true, data: content };
-      }
-      return { success: false, error: 'Invalid request type' };
-    } catch (error) {
-      if (error instanceof Error) {
-        return { success: false, error: error.message };
-      }
-      return { success: false, error: 'Unknown error occurred' };
+  // ===== 共通メソッド =====
+
+  // プロジェクトを取得して検証する共通メソッド
+  private async getValidatedProject(novelId: string): Promise<NovelProject> {
+    await this.discoverNovelProjects();
+    
+    const project = this.novelProjects.get(novelId);
+    if (!project) {
+      throw new Error(`Novel project '${novelId}' not found`);
     }
+    
+    return project;
+  }
+
+  // ファイルの存在を確認する共通メソッド
+  private async fileExists(filePath: string): Promise<boolean> {
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // ファイルを読み込んでプレビューを生成する共通メソッド
+  private async readFileWithPreview(filePath: string, projectPath: string, previewLines: number = 3): Promise<{
+    relativePath: string;
+    content: string;
+    preview: string;
+  }> {
+    const content = await fs.readFile(filePath, 'utf-8');
+    const lines = content.split('\n');
+    const preview = lines.slice(0, previewLines).join('\n');
+    const relativePath = path.relative(projectPath, filePath);
+    
+    return {
+      relativePath,
+      content,
+      preview
+    };
+  }
+
+  // ディレクトリ内のファイルを検索してリストを作成する共通メソッド
+  private async listFilesInDirectories(
+    project: NovelProject,
+    directories: string[],
+    extensions: string[]
+  ): Promise<Array<{filename: string, preview: string}>> {
+    const files: Array<{filename: string, preview: string}> = [];
+    
+    for (const directory of directories) {
+      const fullPath = path.join(project.path, directory);
+      const foundFiles = await findFilesRecursively(fullPath, extensions);
+      
+      for (const filePath of foundFiles) {
+        try {
+          const fileData = await readFileWithPreview(filePath, project.path);
+          files.push({
+            filename: fileData.relativePath,
+            preview: fileData.preview
+          });
+        } catch (error) {
+          // このファイルが読めない場合はスキップ
+          continue;
+        }
+      }
+    }
+    
+    return files;
   }
 } 
