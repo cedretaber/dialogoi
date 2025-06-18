@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { NovelConfig, NovelProject } from '../domain/novel';
-import { fileExists, readFileWithPreview, findFilesRecursively, ensureDirectory } from '../utils/fileUtils';
+import { NovelConfig, NovelProject } from '../domain/novel.js';
+import { fileExists, readFileWithPreview, findFilesRecursively, ensureDirectory } from '../utils/fileUtils.js';
 
 export class NovelService {
   private readonly baseDir: string;
