@@ -1,5 +1,7 @@
 # Dialogoi - Novel Writing Support MCP Server
 
+[![CI](https://github.com/cedretaber/dialogoi/actions/workflows/ci.yml/badge.svg)](https://github.com/cedretaber/dialogoi/actions/workflows/ci.yml)
+
 小説執筆を支援するMCP（Model Context Protocol）サーバです。
 
 ## インストール
