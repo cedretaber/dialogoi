@@ -221,6 +221,56 @@ export class NovelService {
     return searchResults;
   }
 
+  async searchNovelContent(novelId: string, keyword: string): Promise<Array<{filename: string, matchingLines: string[]}>> {
+    await this.discoverNovelProjects();
+    
+    const project = this.novelProjects.get(novelId);
+    if (!project) {
+      throw new Error(`Novel project '${novelId}' not found`);
+    }
+    
+    const extensions = ['txt', 'md'];
+    const searchResults: Array<{filename: string, matchingLines: string[]}> = [];
+    
+    // 本文ディレクトリから全ファイルを検索
+    for (const contentDir of project.config.contentDirectories) {
+      const fullContentPath = path.join(project.path, contentDir);
+      const files = await this.findFilesRecursively(fullContentPath, extensions);
+      
+      for (const filePath of files) {
+        try {
+          const data = await fs.readFile(filePath, 'utf-8');
+          const lines = data.split('\n');
+          const matchingLines: string[] = [];
+          
+          // キーワードを含む行を検索（大文字小文字を区別しない）
+          for (let i = 0; i < lines.length; i++) {
+            if (lines[i].toLowerCase().includes(keyword.toLowerCase())) {
+              // マッチした行とその前後の文脈を含める
+              const contextStart = Math.max(0, i - 1);
+              const contextEnd = Math.min(lines.length - 1, i + 1);
+              const contextLines = lines.slice(contextStart, contextEnd + 1);
+              matchingLines.push(`行${i + 1}: ${contextLines.join('\n')}`);
+            }
+          }
+          
+          if (matchingLines.length > 0) {
+            const relativePath = path.relative(project.path, filePath);
+            searchResults.push({
+              filename: relativePath,
+              matchingLines: matchingLines
+            });
+          }
+        } catch (error) {
+          // このファイルが読めない場合はスキップ
+          continue;
+        }
+      }
+    }
+    
+    return searchResults;
+  }
+
   async getNovelContent(novelId: string, filename?: string): Promise<string> {
     await this.discoverNovelProjects();
     

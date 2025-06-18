@@ -40,6 +40,11 @@ const searchNovelSettingsInput = z.object({
   keyword: z.string().describe("検索キーワード")
 });
 
+const searchNovelContentInput = z.object({
+  novelId: z.string().describe("小説のID"),
+  keyword: z.string().describe("検索キーワード")
+});
+
 const getNovelSettingsInput = z.object({
   novelId: z.string().describe("小説のID"),
   filename: z.string().optional().describe("設定ファイル名（省略時は基本設定ファイル）")
@@ -127,6 +132,45 @@ server.registerTool(
       return {
         content: [
           { type: "text" as const, text: settings }
+        ]
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        content: [
+          { type: "text" as const, text: `Error: ${errorMsg}` }
+        ]
+      };
+    }
+  }
+);
+
+// 小説の本文ファイルを検索するツール
+server.registerTool(
+  "search_novel_content",
+  {
+    description: "小説の本文ファイルからキーワードを検索します",
+    inputSchema: searchNovelContentInput.shape
+  },
+  async (params: { novelId: string; keyword: string }) => {
+    try {
+      const searchResults = await novelService.searchNovelContent(params.novelId, params.keyword);
+      
+      if (searchResults.length === 0) {
+        return {
+          content: [
+            { type: "text" as const, text: `キーワード「${params.keyword}」に一致する本文ファイルが見つかりませんでした。` }
+          ]
+        };
+      }
+      
+      const result = searchResults.map(item => 
+        `ファイル名: ${item.filename}\n該当箇所:\n${item.matchingLines.join('\n\n')}\n---`
+      ).join('\n\n');
+      
+      return {
+        content: [
+          { type: "text" as const, text: result }
         ]
       };
     } catch (error) {
