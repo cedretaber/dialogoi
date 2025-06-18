@@ -151,6 +151,22 @@ const getNovelContentInput = z.object({
   filename: z.string().optional().describe("本文ファイル名（省略時は全ファイル結合）")
 });
 
+const addNovelSettingInput = z.object({
+  novelId: z.string().describe("小説のID"),
+  directory: z.string().describe("設定ディレクトリ名"),
+  filename: z.string().describe("ファイル名（.md または .txt）"),
+  content: z.string().describe("ファイル内容"),
+  overwrite: z.boolean().optional().describe("既存ファイルを上書きするか（デフォルト: false）")
+});
+
+const addNovelContentInput = z.object({
+  novelId: z.string().describe("小説のID"),
+  directory: z.string().describe("本文ディレクトリ名"),
+  filename: z.string().describe("ファイル名（.md または .txt）"),
+  content: z.string().describe("ファイル内容"),
+  overwrite: z.boolean().optional().describe("既存ファイルを上書きするか（デフォルト: false）")
+});
+
 // 小説プロジェクト一覧を取得するツール
 server.registerTool(
   "list_novel_projects",
@@ -224,6 +240,72 @@ server.registerTool(
       return {
         content: [
           { type: "text" as const, text: content }
+        ]
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        content: [
+          { type: "text" as const, text: `Error: ${errorMsg}` }
+        ]
+      };
+    }
+  }
+);
+
+// 設定ファイルを追加するツール
+server.registerTool(
+  "add_novel_setting",
+  {
+    description: "小説の設定ファイルを新規作成します（セキュリティチェック付き）",
+    inputSchema: addNovelSettingInput.shape
+  },
+  async (params: { novelId: string; directory: string; filename: string; content: string; overwrite?: boolean }) => {
+    try {
+      await novelService.addNovelSetting(
+        params.novelId,
+        params.directory,
+        params.filename,
+        params.content,
+        params.overwrite || false
+      );
+      
+      return {
+        content: [
+          { type: "text" as const, text: `設定ファイル '${params.filename}' を '${params.directory}' ディレクトリに正常に作成しました。` }
+        ]
+      };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : "Unknown error occurred";
+      return {
+        content: [
+          { type: "text" as const, text: `Error: ${errorMsg}` }
+        ]
+      };
+    }
+  }
+);
+
+// 本文ファイルを追加するツール
+server.registerTool(
+  "add_novel_content",
+  {
+    description: "小説の本文ファイルを新規作成します（セキュリティチェック付き）",
+    inputSchema: addNovelContentInput.shape
+  },
+  async (params: { novelId: string; directory: string; filename: string; content: string; overwrite?: boolean }) => {
+    try {
+      await novelService.addNovelContent(
+        params.novelId,
+        params.directory,
+        params.filename,
+        params.content,
+        params.overwrite || false
+      );
+      
+      return {
+        content: [
+          { type: "text" as const, text: `本文ファイル '${params.filename}' を '${params.directory}' ディレクトリに正常に作成しました。` }
         ]
       };
     } catch (error) {

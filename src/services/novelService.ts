@@ -308,6 +308,128 @@ export class NovelService {
     return contentFiles.sort((a, b) => a.filename.localeCompare(b.filename));
   }
 
+  // セキュリティチェック関数
+  private validateFileInput(filename: string, content: string): void {
+    // ファイル名の検証
+    if (!filename || filename.trim() === '') {
+      throw new Error('ファイル名が指定されていません');
+    }
+
+    // パストラバーサル攻撃の防止
+    if (filename.includes('..') || filename.includes('/') || filename.includes('\\')) {
+      throw new Error('ファイル名に不正な文字が含まれています');
+    }
+
+    // ファイル名の文字制限（英数字、日本語、ハイフン、アンダースコア、ドットのみ）
+    const validFilenameRegex = /^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF_\-\.]+$/;
+    if (!validFilenameRegex.test(filename)) {
+      throw new Error('ファイル名に使用できない文字が含まれています');
+    }
+
+    // 拡張子の制限
+    const allowedExtensions = ['.md', '.txt'];
+    const ext = path.extname(filename).toLowerCase();
+    if (!allowedExtensions.includes(ext)) {
+      throw new Error('許可されていない拡張子です（.md, .txt のみ許可）');
+    }
+
+    // ファイルサイズ制限（10MB）
+    const maxSize = 10 * 1024 * 1024;
+    const contentBytes = Buffer.byteLength(content, 'utf8');
+    if (contentBytes > maxSize) {
+      throw new Error(`ファイルサイズが制限を超えています（最大: ${Math.round(maxSize / 1024 / 1024)}MB）`);
+    }
+
+    // 内容の検証
+    if (content.length === 0) {
+      throw new Error('ファイル内容が空です');
+    }
+  }
+
+  // 設定ファイルを追加
+  async addNovelSetting(novelId: string, directory: string, filename: string, content: string, overwrite: boolean = false): Promise<void> {
+    await this.discoverNovelProjects();
+    
+    const project = this.novelProjects.get(novelId);
+    if (!project) {
+      throw new Error(`Novel project '${novelId}' not found`);
+    }
+
+    // セキュリティチェック
+    this.validateFileInput(filename, content);
+
+    // ディレクトリが設定ディレクトリに含まれているかチェック
+    if (!project.config.settingsDirectories.includes(directory)) {
+      throw new Error(`Directory '${directory}' is not configured as a settings directory`);
+    }
+
+    // ファイルパスの構築
+    const targetDir = path.join(project.path, directory);
+    const filePath = path.join(targetDir, filename);
+
+    // ディレクトリが存在しない場合は作成
+    await fs.mkdir(targetDir, { recursive: true });
+
+    // 既存ファイルのチェック
+    let fileExists = false;
+    try {
+      await fs.access(filePath);
+      fileExists = true;
+    } catch (accessError) {
+      // ファイルが存在しない場合は正常（新規作成）
+      fileExists = false;
+    }
+
+    if (fileExists && !overwrite) {
+      throw new Error(`File '${filename}' already exists. Set overwrite=true to replace it.`);
+    }
+
+    // ファイル作成
+    await fs.writeFile(filePath, content, 'utf-8');
+  }
+
+  // 本文ファイルを追加
+  async addNovelContent(novelId: string, directory: string, filename: string, content: string, overwrite: boolean = false): Promise<void> {
+    await this.discoverNovelProjects();
+    
+    const project = this.novelProjects.get(novelId);
+    if (!project) {
+      throw new Error(`Novel project '${novelId}' not found`);
+    }
+
+    // セキュリティチェック
+    this.validateFileInput(filename, content);
+
+    // ディレクトリが本文ディレクトリに含まれているかチェック
+    if (!project.config.contentDirectories.includes(directory)) {
+      throw new Error(`Directory '${directory}' is not configured as a content directory`);
+    }
+
+    // ファイルパスの構築
+    const targetDir = path.join(project.path, directory);
+    const filePath = path.join(targetDir, filename);
+
+    // ディレクトリが存在しない場合は作成
+    await fs.mkdir(targetDir, { recursive: true });
+
+    // 既存ファイルのチェック
+    let fileExists = false;
+    try {
+      await fs.access(filePath);
+      fileExists = true;
+    } catch (accessError) {
+      // ファイルが存在しない場合は正常（新規作成）
+      fileExists = false;
+    }
+
+    if (fileExists && !overwrite) {
+      throw new Error(`File '${filename}' already exists. Set overwrite=true to replace it.`);
+    }
+
+    // ファイル作成
+    await fs.writeFile(filePath, content, 'utf-8');
+  }
+
   async handleMCPRequest(request: MCPRequest): Promise<MCPResponse> {
     try {
       if (request.type === 'settings') {
