@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { NovelConfig, NovelProject } from '../types/novel';
+import { NovelConfig, NovelProject } from '../domain/novel';
 import { fileExists, readFileWithPreview, findFilesRecursively, ensureDirectory } from '../utils/fileUtils';
 
 export class NovelService {
