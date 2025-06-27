@@ -243,6 +243,85 @@ export class NovelService {
     return contentFiles.sort((a, b) => a.filename.localeCompare(b.filename));
   }
 
+  // ===== 指示ファイル（AI Instructions）操作 =====
+
+  /**
+   * プロジェクト配下の指示ファイル一覧（プレビュー付き）を取得
+   */
+  async listNovelInstructions(
+    novelId: string,
+  ): Promise<Array<{ filename: string; preview: string }>> {
+    const project = await this.getValidatedProject(novelId);
+
+    const candidates = this.getInstructionFileCandidates(project);
+    const results: Array<{ filename: string; preview: string }> = [];
+
+    for (const relative of candidates) {
+      const filePath = path.join(project.path, relative);
+      const exists = await this.fileExists(filePath);
+      if (!exists) continue;
+
+      try {
+        const { preview } = await readFileWithPreview(filePath, project.path);
+        results.push({ filename: relative, preview });
+      } catch {
+        // 読み込み失敗はスキップ
+        continue;
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * 指示ファイルの内容を取得
+   * filename を省略すると候補ファイルをすべて結合して返す
+   */
+  async getNovelInstructions(novelId: string, filename?: string): Promise<string> {
+    const project = await this.getValidatedProject(novelId);
+    const candidates = this.getInstructionFileCandidates(project);
+
+    if (filename) {
+      const targetPath = path.join(project.path, filename);
+      try {
+        const data = await fs.readFile(targetPath, 'utf-8');
+        return data;
+      } catch (error) {
+        throw new Error(
+          `Failed to read instruction file '${filename}': ${error instanceof Error ? error.message : 'Unknown error'}`,
+        );
+      }
+    }
+
+    // filename が無い場合は候補をすべて結合
+    let combined = '';
+    for (const relative of candidates) {
+      const targetPath = path.join(project.path, relative);
+      const exists = await this.fileExists(targetPath);
+      if (!exists) continue;
+      try {
+        const data = await fs.readFile(targetPath, 'utf-8');
+        combined += `=== ${relative} ===\n${data}\n\n`;
+      } catch {
+        continue;
+      }
+    }
+
+    if (combined === '') {
+      throw new Error(`No instruction files found for novel '${novelId}'`);
+    }
+
+    return combined;
+  }
+
+  /** 候補となる指示ファイルリストを返す */
+  private getInstructionFileCandidates(project: NovelProject): string[] {
+    if (project.config.instructionFiles && project.config.instructionFiles.length > 0) {
+      return project.config.instructionFiles;
+    }
+    return ['DIALOGOI.md'];
+  }
+
   // セキュリティチェック関数
   private validateFileInput(filename: string, content: string): void {
     // ファイル名の検証

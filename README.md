@@ -28,6 +28,7 @@ npm run build
 novels/
 ├── your_novel_1/
 │   ├── novel.json          # プロジェクト設定
+│   ├── DIALOGOI.md        # 生成AI向けガイドライン（任意）
 │   ├── settings/           # 設定ファイル
 │   │   ├── characters.md
 │   │   └── worldbuilding.txt
@@ -50,6 +51,7 @@ novels/
   "description": "小説の概要",
   "settingsDirectories": ["settings", "docs"],
   "contentDirectories": ["contents", "chapters"],
+  "instructionFiles": ["DIALOGOI.md"],
   "createdAt": "2024-03-14T00:00:00Z",
   "updatedAt": "2024-03-14T00:00:00Z"
 }
@@ -176,6 +178,19 @@ novels/
 - `overwrite`: 既存ファイルを上書きするか（デフォルト: false）
 
 **使用例:** "新しい章を追加して"
+
+#### 10. `list_novel_instructions`
+小説プロジェクト内の指示ファイル一覧とプレビューを取得（デフォルトは DIALOGOI.md）
+
+**パラメータ:**
+- `novelId`: 小説のID
+
+#### 11. `get_novel_instructions`
+指示ファイルの内容を取得（filename を省略すると複数ファイルを結合）
+
+**パラメータ:**
+- `novelId`: 小説のID
+- `filename`: ファイル名（省略時は全指示ファイルを結合）
 
 ## セキュリティ機能
 

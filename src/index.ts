@@ -208,6 +208,17 @@ const addNovelContentInput = z.object({
   overwrite: z.boolean().optional().describe('既存ファイルを上書きするか（デフォルト: false）'),
 });
 
+// ===== 指示ファイル =====
+
+const listNovelInstructionsInput = z.object({
+  novelId: z.string().describe('小説のID'),
+});
+
+const getNovelInstructionsInput = z.object({
+  novelId: z.string().describe('小説のID'),
+  filename: z.string().optional().describe('指示ファイル名（省略時は全ファイル結合）'),
+});
+
 // 小説プロジェクト一覧を取得するツール
 server.registerTool(
   'list_novel_projects',
@@ -362,6 +373,52 @@ server.registerTool(
       return {
         content: [{ type: 'text' as const, text: `Error: ${errorMsg}` }],
       };
+    }
+  },
+);
+
+// 指示ファイル一覧を取得
+server.registerTool(
+  'list_novel_instructions',
+  {
+    description:
+      '[必須:最初に実行] 小説プロジェクトのガイドライン(DIALOGOI.md など)を確認するためのツールです。指示ファイル一覧と各ファイルの先頭3行を取得します。',
+    inputSchema: listNovelInstructionsInput.shape,
+  },
+  async (params: { novelId: string }) => {
+    try {
+      const list = await novelService.listNovelInstructions(params.novelId);
+      if (list.length === 0) {
+        return {
+          content: [{ type: 'text' as const, text: '指示ファイルが見つかりませんでした。' }],
+        };
+      }
+      const result = list
+        .map((item) => `ファイル名: ${item.filename}\nプレビュー:\n${item.preview}\n---`)
+        .join('\n\n');
+      return { content: [{ type: 'text' as const, text: result }] };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      return { content: [{ type: 'text' as const, text: `Error: ${errorMsg}` }] };
+    }
+  },
+);
+
+// 指示ファイル取得
+server.registerTool(
+  'get_novel_instructions',
+  {
+    description:
+      '[必須:最初に実行] プロジェクトのガイドライン(DIALOGOI.md)を全文取得します。filename を省略すると全指示ファイルを結合して返します。',
+    inputSchema: getNovelInstructionsInput.shape,
+  },
+  async (params: { novelId: string; filename?: string }) => {
+    try {
+      const content = await novelService.getNovelInstructions(params.novelId, params.filename);
+      return { content: [{ type: 'text' as const, text: content }] };
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      return { content: [{ type: 'text' as const, text: `Error: ${errorMsg}` }] };
     }
   },
 );
