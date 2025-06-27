@@ -50,4 +50,4 @@ describe('NovelService (read-only operations)', () => {
     expect(content.length).toBeGreaterThan(0);
     expect(content).toMatch(/chapter_1.txt/);
   });
-}); 
+});

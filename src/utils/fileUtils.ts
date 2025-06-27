@@ -23,9 +23,9 @@ export async function fileExists(filePath: string): Promise<boolean> {
  * @returns ファイルの相対パス、内容、プレビュー
  */
 export async function readFileWithPreview(
-  filePath: string, 
-  basePath: string, 
-  previewLines: number = 3
+  filePath: string,
+  basePath: string,
+  previewLines: number = 3,
 ): Promise<{
   relativePath: string;
   content: string;
@@ -35,11 +35,11 @@ export async function readFileWithPreview(
   const lines = content.split('\n');
   const preview = lines.slice(0, previewLines).join('\n');
   const relativePath = path.relative(basePath, filePath);
-  
+
   return {
     relativePath,
     content,
-    preview
+    preview,
   };
 }
 
@@ -50,17 +50,17 @@ export async function readFileWithPreview(
  * @returns 見つかったファイルの絶対パスリスト
  */
 export async function findFilesRecursively(
-  dirPath: string, 
-  extensions: string[]
+  dirPath: string,
+  extensions: string[],
 ): Promise<string[]> {
   const files: string[] = [];
-  
+
   try {
     const entries = await fs.readdir(dirPath, { withFileTypes: true });
-    
+
     for (const entry of entries) {
       const fullPath = path.join(dirPath, entry.name);
-      
+
       if (entry.isDirectory()) {
         // サブディレクトリも検索
         const subFiles = await findFilesRecursively(fullPath, extensions);
@@ -75,7 +75,7 @@ export async function findFilesRecursively(
   } catch (error) {
     // ディレクトリが存在しない場合はスキップ
   }
-  
+
   return files;
 }
 
@@ -85,4 +85,4 @@ export async function findFilesRecursively(
  */
 export async function ensureDirectory(dirPath: string): Promise<void> {
   await fs.mkdir(dirPath, { recursive: true });
-} 
+}

@@ -7,10 +7,12 @@
 ## インストール
 
 ### 前提条件
+
 - Node.js (18.0.0以上)
 - npm または yarn
 
 ### セットアップ
+
 ```bash
 git clone https://github.com/cedretaber/dialogoi
 cd dialogoi
@@ -56,6 +58,7 @@ novels/
 ## Claude Desktop連携
 
 ### 設定ファイル例
+
 `claude_desktop_config.json`に以下を追加：
 
 ```json
@@ -71,6 +74,7 @@ novels/
 ```
 
 **設定ファイルの場所:**
+
 - Windows: `%APPDATA%\Claude\claude_desktop_config.json`
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Linux: `~/.config/Claude/claude_desktop_config.json`
@@ -78,38 +82,49 @@ novels/
 ## API一覧
 
 ### プロジェクト管理
+
 #### 1. `list_novel_projects`
+
 利用可能な小説プロジェクト一覧を取得
 
 **使用例:** "どんな小説があるか教えて"
 
 ### 設定ファイル操作
+
 #### 2. `list_novel_settings`
+
 指定した小説の設定ファイル一覧とプレビューを取得
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 
 #### 3. `get_novel_settings`
+
 設定ファイルの内容を取得（全体結合または個別指定）
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 - `filename`: ファイル名（省略時は全設定ファイルを結合）
 
 #### 4. `search_novel_settings`
+
 設定ファイル内をキーワード検索
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 - `keyword`: 検索キーワード
 
 **使用例:** "魔法システムについて調べて"
 
 #### 5. `add_novel_setting`
+
 設定ファイルを新規作成（セキュリティ機能付き）
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 - `directory`: 設定ディレクトリ名
 - `filename`: ファイル名（.md または .txt）
@@ -119,32 +134,41 @@ novels/
 **使用例:** "新しいキャラクター設定ファイルを作成して"
 
 ### 本文ファイル操作
+
 #### 6. `list_novel_content`
+
 指定した小説の本文ファイル一覧とプレビューを取得
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 
 #### 7. `get_novel_content`
+
 本文ファイルの内容を取得（全体結合または個別指定）
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 - `filename`: ファイル名（省略時は全本文ファイルを結合）
 
 #### 8. `search_novel_content`
+
 本文ファイル内をキーワード検索
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 - `keyword`: 検索キーワード
 
 **使用例:** "主人公の名前が出てくる箇所を探して"
 
 #### 9. `add_novel_content`
+
 本文ファイルを新規作成（セキュリティ機能付き）
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 - `directory`: 本文ディレクトリ名
 - `filename`: ファイル名（.md または .txt）
@@ -158,6 +182,7 @@ novels/
 ファイル作成API（`add_novel_setting`、`add_novel_content`）には以下のセキュリティ機能が実装されています：
 
 ### 安全性の確保
+
 - **パストラバーサル攻撃防止**: `../` などの不正なパスをブロック
 - **ファイル拡張子制限**: `.md` と `.txt` のみ許可
 - **ファイル名制限**: 英数字、日本語、一部記号のみ許可
@@ -170,6 +195,7 @@ novels/
 Claude Desktopでの実際の使用例：
 
 ### 基本的な読み取り操作
+
 ```
 1. "現在執筆中の小説一覧を教えて"
    → list_novel_projects が実行され、プロジェクト一覧を表示
@@ -182,6 +208,7 @@ Claude Desktopでの実際の使用例：
 ```
 
 ### 検索機能
+
 ```
 4. "魔法システムについて設定ファイルから調べて"
    → search_novel_settings で魔法関連の設定を検索
@@ -191,6 +218,7 @@ Claude Desktopでの実際の使用例：
 ```
 
 ### ファイル作成機能
+
 ```
 6. "新しいキャラクター設定ファイルを作成して"
    → add_novel_setting で設定ファイルを安全に作成
@@ -205,16 +233,19 @@ Claude Desktopでの実際の使用例：
 ## 開発
 
 ### ビルド
+
 ```bash
 npm run build
 ```
 
 ### 開発モード
+
 ```bash
 npm run dev
 ```
 
 ### テスト
+
 ```bash
 npm test
 ```
@@ -222,4 +253,3 @@ npm test
 ## ライセンス
 
 MIT License
- 

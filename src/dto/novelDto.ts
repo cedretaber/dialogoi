@@ -8,4 +8,4 @@ export interface NovelDetailDto extends NovelSummaryDto {
   author?: string;
   createdAt?: string; // ISO8601
   updatedAt?: string;
-} 
+}

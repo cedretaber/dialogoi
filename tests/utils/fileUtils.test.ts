@@ -65,4 +65,4 @@ describe('fileUtils', () => {
     expect(result).toContain(mdPath);
     expect(result).not.toContain(otherPath);
   });
-}); 
+});
