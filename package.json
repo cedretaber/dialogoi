@@ -10,7 +10,9 @@
     "dev": "node --loader ts-node/esm src/index.ts",
     "test": "vitest",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 0",
-    "format": "prettier --write ."
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.3",

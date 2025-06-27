@@ -180,15 +180,19 @@ novels/
 **使用例:** "新しい章を追加して"
 
 #### 10. `list_novel_instructions`
+
 小説プロジェクト内の指示ファイル一覧とプレビューを取得（デフォルトは DIALOGOI.md）
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 
 #### 11. `get_novel_instructions`
+
 指示ファイルの内容を取得（filename を省略すると複数ファイルを結合）
 
 **パラメータ:**
+
 - `novelId`: 小説のID
 - `filename`: ファイル名（省略時は全指示ファイルを結合）
 

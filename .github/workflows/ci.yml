@@ -28,6 +28,12 @@ jobs:
       - name: Run ESLint
         run: npm run lint
 
+      - name: Type check (tsc --noEmit)
+        run: npm run typecheck
+
+      - name: Prettier format check
+        run: npm run format:check
+
       - name: Build (type-check)
         run: npm run build --if-present
 
