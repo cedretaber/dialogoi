@@ -4,25 +4,25 @@ import dotenv from 'dotenv';
 import { z } from 'zod';
 import { NovelService } from './services/novelService.js';
 import path from 'path';
-import { fileURLToPath } from 'url';
+import { loadConfig } from './lib/config.js';
 
 dotenv.config();
 
-// コマンドライン引数からベースディレクトリを取得
-const args = process.argv.slice(2);
-const baseDirIndex = args.indexOf('--base-dir');
-let baseDir: string | undefined;
+// Dialogoi設定を読み込み（コマンドライン引数の上書きも適用される）
+const dialogoiConfig = loadConfig();
 
-if (baseDirIndex !== -1 && baseDirIndex + 1 < args.length) {
-  baseDir = args[baseDirIndex + 1];
-} else {
-  // 引数が指定されていない場合は、スクリプトのディレクトリを基準にする
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  baseDir = path.join(__dirname, '..');
-}
+// プロジェクトルートディレクトリを決定
+// 設定のprojectRootを使用（既にコマンドライン引数で上書きされている可能性がある）
+const baseDir = path.resolve(dialogoiConfig.projectRoot);
 
-console.error(`Using base directory: ${baseDir}`);
+console.error(`✅ Dialogoi設定を読み込みました`);
+console.error(`📁 プロジェクトルート: ${baseDir}`);
+console.error(
+  `📊 チャンク設定: maxTokens=${dialogoiConfig.chunk.maxTokens}, overlap=${dialogoiConfig.chunk.overlap}`,
+);
+console.error(
+  `🔍 検索設定: defaultK=${dialogoiConfig.search.defaultK}, maxK=${dialogoiConfig.search.maxK}`,
+);
 
 const novelService = new NovelService(baseDir);
 

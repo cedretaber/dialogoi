@@ -37,7 +37,7 @@ flowchart TD
 
 | フィールド     | 型          | 説明                                         |
 | --------- | ---------- | ------------------------------------------ |
-| `id`      | `string`   | `file::section::para-N[@hash]` ― グローバル一意キー |
+| `id`      | `string`   | `file::section::para-N::chunk-M[@hash]` ― グローバル一意キー |
 | `title`   | `string`   | 章・節タイトル（重み付け 3）                            |
 | `content` | `string`   | チャンク本文（200–400 トークン）                       |
 | `tags`    | `string[]` | オプション ― 例: `伏線:追跡装置`                       |
@@ -85,7 +85,7 @@ Dialogoi/
 │  │   └─ watcher.ts            # chokidar ラッパー
 │  └─ indexer.ts                # インデックス管理
 ├─ config/
-│  └─ dialogoi.config.yaml
+│  └─ dialogoi.config.json
 └─ test/
    └─ search_rag.spec.ts
 ```
@@ -96,7 +96,7 @@ Dialogoi/
 
 ### 6.1 起動時
 
-1. `dialogoi.config.yaml` をロード。
+1. `dialogoi.config.json` をロード（コマンドライン引数で上書き可能）。
 2. `cache/index.json` が存在すれば `importIndex()`。
 3. 無ければ **`*.md` / `*.txt`** を全走査 → `chunker.ts` → `add()`。
 4. 初期化後 `exportIndex()`（≈50 k チャンクで 3 秒未満）。
@@ -142,16 +142,28 @@ MCP ラッパーが Markdown `> 引用` に整形して LLM プロンプトに�
 
 ## 8  設定例
 
-```yaml
-# config/dialogoi.config.yaml
-vector: "none"          # フェーズ2で "hybrid" に
-projectRoot: "./novel"
-chunk:
-  maxTokens: 400
-  overlap: 0.2
-flex:
-  profile: "fast"
-  exportPath: "./cache/index.json"
+```json
+{
+  "vector": "none",
+  "projectRoot": "./novels",
+  "chunk": {
+    "maxTokens": 400,
+    "overlap": 0.2
+  },
+  "flex": {
+    "profile": "fast",
+    "exportPath": "./cache/index.json"
+  },
+  "search": {
+    "defaultK": 10,
+    "maxK": 50
+  }
+}
+```
+
+コマンドライン引数での上書き例：
+```bash
+npm run dev -- --project-root ./my-novels --max-tokens 300
 ```
 
 ---

@@ -1,7 +1,7 @@
 {
-  "name": "mcp-server",
+  "name": "dialogoi-mcp",
   "version": "1.0.0",
-  "description": "MCP Server implementation in TypeScript",
+  "description": "Dialogoi - RAG-powered MCP Server for Novel Projects",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -9,6 +9,7 @@
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts",
     "test": "vitest",
+    "test:watch": "vitest --watch",
     "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
@@ -16,14 +17,17 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.3",
+    "chokidar": "^3.6.0",
     "dotenv": "^16.4.5",
     "express": "^4.18.2",
+    "flexsearch": "^0.7.43",
     "node-fetch": "^2.7.0",
     "ws": "^8.16.0",
     "zod": "^3.25.67"
   },
   "devDependencies": {
     "@types/express": "^4.17.21",
+    "@types/flexsearch": "^0.7.6",
     "@types/jest": "^29.5.12",
     "@types/node": "^20.11.24",
     "@types/node-fetch": "^2.6.12",
