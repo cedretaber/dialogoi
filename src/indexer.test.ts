@@ -271,17 +271,17 @@ describe('Indexer', () => {
   });
 
   describe('findTargetFiles', () => {
-    it('node_modules、dist、.gitディレクトリを除外する', async () => {
+    it('隠しディレクトリを除外する', async () => {
       const mockFiles = [
         '/test/project/file.md',
-        '/test/project/node_modules/package/file.md',
-        '/test/project/dist/output.md',
-        '/test/project/.git/objects/file.md',
+        '/test/project/.cache/temp.md',
+        '/test/project/.git/config.md',
+        '/test/project/.hidden/secret.md',
       ];
 
       vi.mocked(glob).mockImplementation(async () => {
         // globの実装でignoreオプションが正しく動作することを想定
-        // node_modules、dist、.gitを除外したファイルのみ返す
+        // 隠しディレクトリを除外したファイルのみ返す
         return [mockFiles[0]];
       });
 

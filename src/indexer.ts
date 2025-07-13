@@ -114,7 +114,7 @@ export class Indexer {
     const files: string[] = [];
     for (const pattern of patterns) {
       const matches = await glob(pattern, {
-        ignore: ['**/node_modules/**', '**/dist/**', '**/.git/**'],
+        ignore: ['**/.*/**'],
       });
       files.push(...matches);
     }
