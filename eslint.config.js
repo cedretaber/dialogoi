@@ -12,16 +12,16 @@ export default [
       parserOptions: {
         ecmaVersion: 2021,
         sourceType: 'module',
-        project: './tsconfig.json'
+        project: './tsconfig.json',
       },
       globals: {
         node: true,
-        es2021: true
-      }
+        es2021: true,
+      },
     },
     plugins: {
       '@typescript-eslint': typescriptEslint,
-      prettier: prettierPlugin
+      prettier: prettierPlugin,
     },
     rules: {
       ...typescriptEslint.configs.recommended.rules,
@@ -32,9 +32,9 @@ export default [
         {
           argsIgnorePattern: '^_',
           varsIgnorePattern: '^_',
-          caughtErrors: 'none'
-        }
-      ]
-    }
-  }
+          caughtErrors: 'none',
+        },
+      ],
+    },
+  },
 ];
