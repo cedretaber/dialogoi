@@ -334,7 +334,6 @@ export class NovelService {
       throw new Error('ファイル名に不正な文字が含まれています');
     }
 
-    // eslint-disable-next-line no-useless-escape
     const validFilenameRegex = /^[a-zA-Z0-9\u3040-\u309F\u30A0-\u30FF\u4E00-\u9FAF_\-.]+$/;
     if (!validFilenameRegex.test(filename)) {
       throw new Error('ファイル名に使用できない文字が含まれています');

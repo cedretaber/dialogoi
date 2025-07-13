@@ -1,4 +1,4 @@
-import fetch from 'node-fetch';
+// Node.js 18+ の内蔵 fetch を使用
 
 // Node.jsのWeb Streams APIをグローバルに設定
 globalThis.TransformStream = (await import('node:stream/web')).TransformStream;
@@ -57,3 +57,5 @@ async function main() {
 }
 
 main().catch(console.error);
+
+export {};
