@@ -67,7 +67,14 @@ novels/
 
 ### 検索アーキテクチャ（フェーズ 1）
 
-現在は FlexSearch ベースの全文検索を実装。抽象 SearchBackend インターフェースにより、将来のベクトル検索追加をサポート。
+FlexSearch 0.8.205 ベースの Document Search API を使用。タグ・タイトル・コンテンツを横断する部分一致検索で、小説執筆に最適化された直感的な検索を提供。抽象 SearchBackend インターフェースにより、将来のベクトル検索追加をサポート。
+
+### 主要技術仕様
+
+- **FlexSearch 0.8.205**: Document Search API、メモリ内インデックス
+- **Chunkクラス**: getter方式でid/hash/baseIdを動的生成
+- **ファイル単位削除**: タグシステムを使った効率的な削除機能
+- **メモリ効率**: FlexSearchのstore機能を活用、冗長データ構造を排除
 
 ### セキュリティ機能
 
