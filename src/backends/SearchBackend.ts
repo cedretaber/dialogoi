@@ -21,10 +21,10 @@ export interface Chunk {
   title: string; // 章・節タイトル
   content: string; // チャンク本文
   tags?: string[]; // オプションのタグ
-  metadata?: {
+  metadata: {
     file: string;
-    start: number;
-    end: number;
+    startLine: number;
+    endLine: number;
   };
 }
 

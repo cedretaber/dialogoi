@@ -131,12 +131,27 @@ MCP ラッパーが Markdown `> 引用` に整形して LLM プロンプトに�
 
 ## 7 実装チェックリスト
 
-- [ ] **chunker.ts** ― 再帰チャンク化 (見出し → 段落) + 20 % オーバーラップ
-- [ ] **FlexBackend.search()** — `index.search(q,{limit:100,enrich:true})`
-- [ ] **watcher.ts** ― `add/change/unlink` を Indexer へ
-- [ ] **Indexer.export/import** ― JSON シリアライズ
-- [ ] **search_rag.ts** ― MCP ツール登録 & 引数バリデーション
-- [ ] **Unit tests** (jest/vitest) ― precision\@k, hot-update 動作
+- [x] **chunker.ts** ― 再帰チャンク化 (見出し → 段落) + 20 % オーバーラップ ✅ **完了**
+- [x] **FlexBackend.ts** ― Document Search API + export/import機能 ✅ **完了**
+- [ ] **indexer.ts** ― インデックス管理とexport/import機能 🚧 **次のタスク**
+- [ ] **search_rag.ts** ― MCP ツールとして公開 📋 **予定**
+- [ ] **watcher.ts** ― chokidarを使ったファイル監視 📋 **予定**
+- [ ] **Unit tests** (vitest) ― precision@k, hot-update動作テスト 📋 **予定**
+
+### 現在の進捗状況 (2025-01-13)
+
+**完了済み:**
+
+1. **chunker.ts実装** - MarkdownChunkingStrategy with 20% overlap, 25テスト全て成功
+2. **FlexBackend.ts実装** - Document Search API, 正しいexport/import, 28テスト全て成功
+
+**次のタスク:** 3. **indexer.ts実装** - インデックス管理とexport/import機能
+
+**技術的な知見:**
+
+- FlexSearchのDocument Search APIはstore: trueが必須
+- export/importは公式ドキュメント通り (id, document) => void のコールバック形式
+- TypeScript型安全性を'any'型なしで維持
 
 ---
 
