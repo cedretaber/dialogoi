@@ -7,7 +7,7 @@ import {
   readFileWithPreview,
   findFilesRecursively,
   ensureDirectory,
-} from '../../src/utils/fileUtils';
+} from './fileUtils.js';
 
 describe('fileUtils', () => {
   const tempRoot = path.join(process.cwd(), 'test-temp-utils');

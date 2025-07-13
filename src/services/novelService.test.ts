@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
-import { NovelService } from '../../src/services/novelService';
+import { NovelService } from './novelService.js';
 
 // Use the actual novels directory that exists in the repository
 const novelsDir = path.join(process.cwd(), 'novels');

@@ -9,7 +9,7 @@ import {
   OverlapCalculator,
   TextSplitStrategy,
   createChunker,
-} from '../../src/lib/chunker.js';
+} from './chunker.js';
 
 describe('SimpleTokenCounter', () => {
   let tokenCounter: TokenCounter;

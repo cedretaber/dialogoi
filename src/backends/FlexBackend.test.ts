@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { FlexBackend } from '../../src/backends/FlexBackend.js';
-import { Chunk } from '../../src/backends/SearchBackend.js';
+import { FlexBackend } from './FlexBackend.js';
+import { Chunk } from './SearchBackend.js';
 import fs from 'fs/promises';
 import path from 'path';
 

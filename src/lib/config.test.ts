@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import * as fs from 'fs';
-import type { DialogoiConfig } from '../../src/lib/config';
+import type { DialogoiConfig } from './config.js';
 
 // モジュールをモック
 vi.mock('fs');
@@ -16,7 +16,7 @@ describe('Config Loader', () => {
     process.argv = [...originalArgv.slice(0, 2)];
     // モジュールをリセットして再インポート
     vi.resetModules();
-    const configModule = await import('../../src/lib/config');
+    const configModule = await import('./config.js');
     loadConfig = configModule.loadConfig;
     getConfig = configModule.getConfig;
   });
