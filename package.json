@@ -20,10 +20,12 @@
     "@modelcontextprotocol/sdk": "^1.12.3",
     "dotenv": "^16.4.5",
     "flexsearch": "^0.7.43",
+    "glob": "^11.0.3",
     "zod": "^3.25.67"
   },
   "devDependencies": {
     "@types/flexsearch": "^0.7.6",
+    "@types/glob": "^8.1.0",
     "@types/node": "^20.11.24",
     "@typescript-eslint/eslint-plugin": "^8.36.0",
     "@typescript-eslint/parser": "^8.36.0",
