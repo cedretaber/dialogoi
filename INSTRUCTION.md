@@ -133,8 +133,8 @@ MCP ラッパーが Markdown `> 引用` に整形して LLM プロンプトに�
 
 - [x] **chunker.ts** ― 再帰チャンク化 (見出し → 段落) + 20 % オーバーラップ ✅ **完了**
 - [x] **FlexBackend.ts** ― Document Search API + export/import機能 ✅ **完了**
-- [ ] **indexer.ts** ― インデックス管理とexport/import機能 🚧 **次のタスク**
-- [ ] **search_rag.ts** ― MCP ツールとして公開 📋 **予定**
+- [x] **indexer.ts** ― インデックス管理とexport/import機能 ✅ **完了**
+- [ ] **search_rag.ts** ― MCP ツールとして公開 📋 **次のタスク**
 - [ ] **watcher.ts** ― chokidarを使ったファイル監視 📋 **予定**
 - [ ] **Unit tests** (vitest) ― precision@k, hot-update動作テスト 📋 **予定**
 
@@ -144,14 +144,17 @@ MCP ラッパーが Markdown `> 引用` に整形して LLM プロンプトに�
 
 1. **chunker.ts実装** - MarkdownChunkingStrategy with 20% overlap, 25テスト全て成功
 2. **FlexBackend.ts実装** - Document Search API, 正しいexport/import, 28テスト全て成功
+3. **indexer.ts実装** - インデックス管理、ファイル走査、export/import機能、17テスト全て成功
 
-**次のタスク:** 3. **indexer.ts実装** - インデックス管理とexport/import機能
+**次のタスク:** 4. **search_rag.ts実装** - MCP ツールとして公開
 
 **技術的な知見:**
 
 - FlexSearchのDocument Search APIはstore: trueが必須
 - export/importは公式ドキュメント通り (id, document) => void のコールバック形式
-- TypeScript型安全性を'any'型なしで維持
+- TypeScript型安全性を'any'型なしで維持（必要最小限のas Presetキャストのみ）
+- glob パターンで node_modules、dist、.git を除外してターゲットファイルを検索
+- removeFileChunks は現在TODO実装（チャンクID管理の追加実装が必要）
 
 ---
 

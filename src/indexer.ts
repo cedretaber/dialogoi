@@ -2,6 +2,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
 import { FlexBackend } from './backends/FlexBackend.js';
+import { Preset } from 'flexsearch';
 import { Chunk } from './backends/SearchBackend.js';
 import { MarkdownChunkingStrategy } from './lib/chunker.js';
 import { DialogoiConfig } from './lib/config.js';
@@ -19,10 +20,10 @@ export class Indexer {
   constructor(config: DialogoiConfig) {
     this.config = config;
     this.projectRoot = path.resolve(config.projectRoot);
-    
+
     // FlexBackend の初期化
     this.backend = new FlexBackend({
-      profile: config.flex.profile as any, // FlexSearchのPreset型との互換性のため
+      profile: config.flex.profile as Preset,
       exportPath: config.flex.exportPath,
     });
 
@@ -83,18 +84,18 @@ export class Indexer {
   async processFile(filePath: string): Promise<Chunk[]> {
     const content = await fs.readFile(filePath, 'utf-8');
     const relativePath = path.relative(this.projectRoot, filePath);
-    
+
     // チャンキング実行
     const chunkData = this.chunkingStrategy.chunk(
       content,
       relativePath,
       this.config.chunk.maxTokens,
-      this.config.chunk.overlap
+      this.config.chunk.overlap,
     );
-    
+
     // ChunkDataはそのままChunkとして使用可能
     const chunks: Chunk[] = chunkData;
-    
+
     // バックエンドに追加
     await this.backend.add(chunks);
 
@@ -128,10 +129,10 @@ export class Indexer {
   async exportIndex(): Promise<void> {
     const exportPath = this.config.flex.exportPath;
     const exportDir = path.dirname(exportPath);
-    
+
     // ディレクトリが存在しない場合は作成
     await fs.mkdir(exportDir, { recursive: true });
-    
+
     await this.backend.exportIndex(exportPath);
     console.log(`💾 インデックスをエクスポートしました: ${exportPath}`);
   }
@@ -141,14 +142,14 @@ export class Indexer {
    */
   async importIndex(): Promise<void> {
     const exportPath = this.config.flex.exportPath;
-    
+
     // ファイルの存在確認
     try {
       await fs.access(exportPath);
     } catch {
       throw new Error(`インデックスファイルが見つかりません: ${exportPath}`);
     }
-    
+
     await this.backend.importIndex(exportPath);
     console.log(`📂 インデックスをインポートしました: ${exportPath}`);
   }
@@ -160,10 +161,10 @@ export class Indexer {
     try {
       // 既存のチャンクを削除
       await this.removeFileChunks(filePath);
-      
+
       // 新しいチャンクを追加
       await this.processFile(filePath);
-      
+
       console.log(`🔄 ファイルを更新しました: ${path.relative(this.projectRoot, filePath)}`);
     } catch (error) {
       console.error(`❌ ファイル更新エラー: ${filePath}`, error);
@@ -185,16 +186,17 @@ export class Indexer {
   /**
    * 特定ファイルのチャンクを削除
    */
-  private async removeFileChunks(filePath: string): Promise<void> {
+  private async removeFileChunks(_filePath: string): Promise<void> {
     // TODO: FlexBackendに全チャンクIDを取得するメソッドを追加するか、
     // ここで該当ファイルのチャンクIDを特定する必要がある
     // 現在は簡単な実装として、ファイル名ベースでIDを推測
-    
+
     // ファイルに関連するチャンクIDを収集（将来改善が必要）
     const chunkIds: string[] = [];
     // TODO: 実際のチャンクID収集ロジックを実装
-    // const relativePath = path.relative(this.projectRoot, filePath);
-    
+    // 現在は仮実装として空配列を返す
+    // 将来的には filePath を使用してチャンクIDを特定する必要がある
+
     if (chunkIds.length > 0) {
       await this.backend.remove(chunkIds);
     }
