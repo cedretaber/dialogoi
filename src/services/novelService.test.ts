@@ -35,7 +35,6 @@ describe('NovelService (read-only operations)', () => {
     const content = await service.getNovelSettings(SAMPLE_NOVEL_ID);
     expect(content.length).toBeGreaterThan(0);
     // The aggregated content should include a marker for a known file
-    const basicSettingPath = path.join('settings', 'basic.md');
     expect(content).toMatch(/settings[\\/]+basic\.md/);
   });
 
