@@ -1,3 +1,5 @@
+import crypto from 'crypto';
+
 /**
  * 検索結果の型定義
  */
@@ -14,18 +16,40 @@ export interface SearchResult {
 }
 
 /**
- * インデックスに追加するチャンクの型定義
+ * インデックスに追加するチャンクのクラス定義
  */
-export interface Chunk {
-  id: string; // file::section::para-N::chunk-M[@hash] 形式
-  title: string; // 章・節タイトル
-  content: string; // チャンク本文
-  tags?: string[]; // オプションのタグ
-  metadata: {
-    file: string;
-    startLine: number;
-    endLine: number;
-  };
+export class Chunk {
+  constructor(
+    public title: string, // 章・節タイトル
+    public content: string, // チャンク本文
+    public filePath: string, // ファイルパス
+    public startLine: number, // 開始行番号
+    public endLine: number, // 終了行番号
+    public chunkIndex: number, // チャンク番号
+    public tags?: string[], // オプションのタグ
+  ) {}
+
+  /**
+   * ベースID（ハッシュなし）を取得
+   */
+  get baseId(): string {
+    return `${this.filePath}::${this.startLine}-${this.endLine}::chunk-${this.chunkIndex}`;
+  }
+
+  /**
+   * チャンクIDを生成（ハッシュ付き）
+   */
+  get id(): string {
+    return `${this.baseId}@${this.hash}`;
+  }
+
+  /**
+   * タイトルとコンテンツのハッシュを生成
+   */
+  get hash(): string {
+    const combined = this.title + '\n' + this.content;
+    return crypto.createHash('md5').update(combined, 'utf8').digest('hex').substring(0, 8);
+  }
 }
 
 /**
@@ -41,10 +65,23 @@ export abstract class SearchBackend {
   abstract add(chunks: Chunk[]): Promise<void>;
 
   /**
-   * チャンクをインデックスから削除
-   * @param ids 削除するチャンクのID配列
+   * チャンクを差分更新（ハッシュ値による重複チェック）
+   * @param chunks 更新するチャンクの配列
+   * @returns 追加・更新・変更なしの件数
    */
-  abstract remove(ids: string[]): Promise<void>;
+  abstract updateChunks(chunks: Chunk[]): Promise<{
+    added: number;
+    updated: number;
+    unchanged: number;
+  }>;
+
+  // removeメソッドは削除（removeByFileで置き換え）
+
+  /**
+   * 指定ファイルに関連するチャンクをすべて削除
+   * @param filePath 削除対象のファイルパス
+   */
+  abstract removeByFile(filePath: string): Promise<void>;
 
   /**
    * 検索を実行
@@ -55,18 +92,6 @@ export abstract class SearchBackend {
   abstract search(query: string, k: number): Promise<SearchResult[]>;
 
   /**
-   * インデックスをエクスポート（永続化）
-   * @param path エクスポート先のパス
-   */
-  abstract exportIndex(path: string): Promise<void>;
-
-  /**
-   * インデックスをインポート（復元）
-   * @param path インポート元のパス
-   */
-  abstract importIndex(path: string): Promise<void>;
-
-  /**
    * インデックスをクリア
    */
   abstract clear(): Promise<void>;
@@ -75,7 +100,6 @@ export abstract class SearchBackend {
    * インデックスの統計情報を取得
    */
   abstract getStats(): Promise<{
-    totalChunks: number;
     memoryUsage?: number;
     lastUpdated?: Date;
   }>;

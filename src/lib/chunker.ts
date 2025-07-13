@@ -1,4 +1,4 @@
-import crypto from 'crypto';
+import { Chunk } from '../backends/SearchBackend.js';
 
 /**
  * トークン数計算の抽象インターフェース
@@ -106,20 +106,7 @@ export class SequentialSplitStrategy implements TextSplitStrategy {
   }
 }
 
-/**
- * チャンクデータ
- */
-export interface ChunkData {
-  id: string; // file::line-start-end::chunk-M@hash 形式
-  title: string; // 章・節タイトル
-  content: string; // チャンク本文
-  tags?: string[]; // オプションのタグ
-  metadata: {
-    file: string; // ファイルパス
-    startLine: number; // 開始行番号
-    endLine: number; // 終了行番号
-  };
-}
+// ChunkDataインターフェースは削除し、Chunkクラスを使用
 
 /**
  * チャンク化戦略の抽象インターフェース
@@ -133,7 +120,7 @@ export interface ChunkingStrategy {
    * @param overlapRatio オーバーラップ比率（0-1）
    * @returns チャンクの配列
    */
-  chunk(text: string, filePath: string, maxTokens: number, overlapRatio: number): ChunkData[];
+  chunk(text: string, filePath: string, maxTokens: number, overlapRatio: number): Chunk[];
 }
 
 /**
@@ -146,9 +133,9 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     private splitStrategy: TextSplitStrategy = new SequentialSplitStrategy(),
   ) {}
 
-  chunk(text: string, filePath: string, maxTokens: number, overlapRatio: number): ChunkData[] {
+  chunk(text: string, filePath: string, maxTokens: number, overlapRatio: number): Chunk[] {
     const lines = text.split('\n');
-    const chunks: ChunkData[] = [];
+    const chunks: Chunk[] = [];
 
     // セクション単位でまず分割
     const sections = this.extractSections(lines);
@@ -222,7 +209,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     filePath: string,
     maxTokens: number,
     overlapRatio: number,
-  ): ChunkData[] {
+  ): Chunk[] {
     const sectionText = section.lines.join('\n');
     const sectionTokens = this.tokenCounter.count(sectionText);
 
@@ -232,16 +219,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     // セクション全体が最大トークン数以下で、かつ段落が1つ以下なら1つのチャンクとして返す
     if (sectionTokens <= maxTokens && paragraphs.length <= 1) {
       return [
-        {
-          id: this.generateChunkId(filePath, section.startLine, section.endLine, 0, sectionText),
-          title: section.title,
-          content: sectionText,
-          metadata: {
-            file: filePath,
-            startLine: section.startLine,
-            endLine: section.endLine,
-          },
-        },
+        new Chunk(section.title, sectionText, filePath, section.startLine, section.endLine, 0),
       ];
     }
 
@@ -257,8 +235,8 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     filePath: string,
     maxTokens: number,
     overlapRatio: number,
-  ): ChunkData[] {
-    const chunks: ChunkData[] = [];
+  ): Chunk[] {
+    const chunks: Chunk[] = [];
     const paragraphs = this.extractParagraphs(section.lines);
 
     let currentChunkLines: string[] = [];
@@ -275,10 +253,10 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
         // 現在のチャンクがあれば先に保存
         if (currentChunkLines.length > 0) {
           chunks.push(
-            this.createChunk(
-              filePath,
+            new Chunk(
               section.title,
               currentChunkLines.join('\n'),
+              filePath,
               currentStartLine,
               currentStartLine + currentChunkLines.length - 1,
               chunkIndex++,
@@ -303,10 +281,10 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
           if (currentChunkLines.length > 0 && testTokens > maxTokens) {
             // 現在のチャンクを保存
             chunks.push(
-              this.createChunk(
-                filePath,
+              new Chunk(
                 section.title,
                 currentChunkLines.join('\n'),
+                filePath,
                 currentStartLine,
                 currentStartLine + currentChunkLines.length - 1,
                 chunkIndex++,
@@ -339,10 +317,10 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
           // 現在のチャンクを完成させる
           if (currentChunkLines.length > 0) {
             chunks.push(
-              this.createChunk(
-                filePath,
+              new Chunk(
                 section.title,
                 currentChunkLines.join('\n'),
+                filePath,
                 currentStartLine,
                 currentStartLine + currentChunkLines.length - 1,
                 chunkIndex++,
@@ -374,10 +352,10 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     // 最後のチャンクを追加
     if (currentChunkLines.length > 0) {
       chunks.push(
-        this.createChunk(
-          filePath,
+        new Chunk(
           section.title,
           currentChunkLines.join('\n'),
+          filePath,
           currentStartLine,
           currentStartLine + currentChunkLines.length - 1,
           chunkIndex,
@@ -386,29 +364,6 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     }
 
     return chunks;
-  }
-
-  /**
-   * チャンクを作成
-   */
-  private createChunk(
-    filePath: string,
-    title: string,
-    content: string,
-    startLine: number,
-    endLine: number,
-    chunkIndex: number,
-  ): ChunkData {
-    return {
-      id: this.generateChunkId(filePath, startLine, endLine, chunkIndex, content),
-      title,
-      content,
-      metadata: {
-        file: filePath,
-        startLine,
-        endLine,
-      },
-    };
   }
 
   /**
@@ -469,26 +424,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     return paragraphs;
   }
 
-  /**
-   * チャンクIDを生成
-   */
-  private generateChunkId(
-    filePath: string,
-    startLine: number,
-    endLine: number,
-    chunkIndex: number,
-    content: string,
-  ): string {
-    const hash = this.generateContentHash(content);
-    return `${filePath}::${startLine}-${endLine}::chunk-${chunkIndex}@${hash}`;
-  }
-
-  /**
-   * コンテンツのハッシュを生成
-   */
-  private generateContentHash(content: string): string {
-    return crypto.createHash('md5').update(content, 'utf8').digest('hex').substring(0, 8);
-  }
+  // generateChunkIdとgenerateContentHashメソッドは削除（Chunkクラスのメソッドで置き換え）
 }
 
 /**

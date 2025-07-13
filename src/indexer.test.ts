@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs/promises';
-import * as path from 'path';
 import { Indexer } from './indexer.js';
 import { DialogoiConfig } from './lib/config.js';
 import { glob } from 'glob';
@@ -43,28 +42,25 @@ describe('Indexer', () => {
   });
 
   describe('initialize', () => {
-    it('既存インデックスがある場合は復元する', async () => {
-      // fs.accessが成功することでファイルが存在することを示す
-      vi.mocked(fs.access).mockResolvedValueOnce(undefined);
-
-      const consoleSpy = vi.spyOn(console, 'log');
-      await indexer.initialize();
-
-      expect(consoleSpy).toHaveBeenCalledWith('✅ 既存インデックスを復元しました');
-    });
-
-    it('既存インデックスがない場合は新規作成する', async () => {
-      // fs.accessが失敗することでファイルが存在しないことを示す
-      vi.mocked(fs.access).mockRejectedValueOnce(new Error('ENOENT'));
-
+    it('インデックスを初期化してフルビルドを実行する', async () => {
       // buildFullIndexの処理に必要なモック
       vi.mocked(glob).mockResolvedValue([]);
-      vi.mocked(fs.mkdir).mockResolvedValueOnce(undefined);
 
       const consoleSpy = vi.spyOn(console, 'log');
       await indexer.initialize();
 
-      expect(consoleSpy).toHaveBeenCalledWith('📝 新規インデックスを作成します');
+      expect(consoleSpy).toHaveBeenCalledWith('📝 インデックスを構築します');
+    });
+
+    it('ファイルが見つからない場合も正常に動作する', async () => {
+      // buildFullIndexの処理に必要なモック
+      vi.mocked(glob).mockResolvedValue([]);
+
+      const consoleSpy = vi.spyOn(console, 'log');
+      await indexer.initialize();
+
+      expect(consoleSpy).toHaveBeenCalledWith('📝 インデックスを構築します');
+      expect(consoleSpy).toHaveBeenCalledWith('📄 0 個のファイルを発見');
     });
   });
 
@@ -135,46 +131,11 @@ describe('Indexer', () => {
       expect(chunks.length).toBeGreaterThan(0);
       expect(chunks[0]).toHaveProperty('id');
       expect(chunks[0]).toHaveProperty('content');
-      expect(chunks[0].metadata.file).toBe('test.md');
+      expect(chunks[0].filePath).toBe('test.md');
     });
   });
 
-  describe('exportIndex', () => {
-    it('インデックスをファイルにエクスポートする', async () => {
-      vi.mocked(fs.mkdir).mockResolvedValueOnce(undefined);
-
-      const consoleSpy = vi.spyOn(console, 'log');
-      await indexer.exportIndex();
-
-      expect(fs.mkdir).toHaveBeenCalledWith(path.dirname(mockConfig.flex.exportPath), {
-        recursive: true,
-      });
-      expect(consoleSpy).toHaveBeenCalledWith(
-        `💾 インデックスをエクスポートしました: ${mockConfig.flex.exportPath}`,
-      );
-    });
-  });
-
-  describe('importIndex', () => {
-    it('インデックスファイルが存在する場合は正常にインポートする', async () => {
-      vi.mocked(fs.access).mockResolvedValueOnce(undefined);
-
-      const consoleSpy = vi.spyOn(console, 'log');
-      await indexer.importIndex();
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        `📂 インデックスをインポートしました: ${mockConfig.flex.exportPath}`,
-      );
-    });
-
-    it('インデックスファイルが存在しない場合はエラーをスローする', async () => {
-      vi.mocked(fs.access).mockRejectedValueOnce(new Error('ENOENT'));
-
-      await expect(indexer.importIndex()).rejects.toThrow(
-        `インデックスファイルが見つかりません: ${mockConfig.flex.exportPath}`,
-      );
-    });
-  });
+  // import/exportメソッドは削除されました
 
   describe('updateFile', () => {
     it('ファイルの更新を処理する', async () => {

@@ -119,8 +119,8 @@ describe('MarkdownChunkingStrategy', () => {
       expect(chunks).toHaveLength(1);
       expect(chunks[0].content).toBe(text);
       expect(chunks[0].title).toBe('Document');
-      expect(chunks[0].metadata.file).toBe(filePath);
-      expect(chunks[0].metadata.startLine).toBe(0);
+      expect(chunks[0].filePath).toBe(filePath);
+      expect(chunks[0].startLine).toBe(0);
     });
 
     it('見出し付きテキストを正しく処理', () => {
@@ -279,9 +279,9 @@ Line 3`;
       expect(chunks).toHaveLength(1);
 
       const chunk = chunks[0];
-      expect(chunk.metadata.file).toBe('test.md');
-      expect(chunk.metadata.startLine).toBe(0);
-      expect(chunk.metadata.endLine).toBe(2);
+      expect(chunk.filePath).toBe('test.md');
+      expect(chunk.startLine).toBe(0);
+      expect(chunk.endLine).toBe(2);
     });
   });
 
@@ -361,9 +361,9 @@ And so ends our tale, but the adventure continues...`;
       expect(chunk.id).toBeTruthy();
       expect(chunk.title).toBeTruthy();
       expect(chunk.content).toBeTruthy();
-      expect(chunk.metadata.file).toBe('novel.md');
-      expect(chunk.metadata.startLine).toBeGreaterThanOrEqual(0);
-      expect(chunk.metadata.endLine).toBeGreaterThanOrEqual(chunk.metadata.startLine);
+      expect(chunk.filePath).toBe('novel.md');
+      expect(chunk.startLine).toBeGreaterThanOrEqual(0);
+      expect(chunk.endLine).toBeGreaterThanOrEqual(chunk.startLine);
     }
 
     // 適切な見出しが含まれていることを確認

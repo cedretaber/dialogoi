@@ -24,7 +24,6 @@ export class Indexer {
     // FlexBackend の初期化
     this.backend = new FlexBackend({
       profile: config.flex.profile as Preset,
-      exportPath: config.flex.exportPath,
     });
 
     // チャンク化戦略の初期化
@@ -33,18 +32,11 @@ export class Indexer {
 
   /**
    * インデックスを初期化
-   * 既存のエクスポートファイルがあれば復元、なければ新規作成
+   * ファイルをスキャンしてインデックスを構築
    */
   async initialize(): Promise<void> {
-    try {
-      // 既存インデックスの復元を試行
-      await this.importIndex();
-      console.log('✅ 既存インデックスを復元しました');
-    } catch (error) {
-      console.log('📝 新規インデックスを作成します');
-      // 新規インデックス作成
-      await this.buildFullIndex();
-    }
+    console.log('📝 インデックスを構築します');
+    await this.buildFullIndex();
   }
 
   /**
@@ -71,8 +63,7 @@ export class Indexer {
       }
     }
 
-    // インデックスをエクスポート
-    await this.exportIndex();
+    // インデックスはメモリ内に保持（エクスポート不要）
 
     const duration = Date.now() - startTime;
     console.log(`🎉 インデックス構築完了: ${totalChunks} チャンク, ${duration}ms`);
@@ -123,36 +114,7 @@ export class Indexer {
     return [...new Set(files)].sort();
   }
 
-  /**
-   * インデックスをファイルにエクスポート
-   */
-  async exportIndex(): Promise<void> {
-    const exportPath = this.config.flex.exportPath;
-    const exportDir = path.dirname(exportPath);
-
-    // ディレクトリが存在しない場合は作成
-    await fs.mkdir(exportDir, { recursive: true });
-
-    await this.backend.exportIndex(exportPath);
-    console.log(`💾 インデックスをエクスポートしました: ${exportPath}`);
-  }
-
-  /**
-   * ファイルからインデックスをインポート
-   */
-  async importIndex(): Promise<void> {
-    const exportPath = this.config.flex.exportPath;
-
-    // ファイルの存在確認
-    try {
-      await fs.access(exportPath);
-    } catch {
-      throw new Error(`インデックスファイルが見つかりません: ${exportPath}`);
-    }
-
-    await this.backend.importIndex(exportPath);
-    console.log(`📂 インデックスをインポートしました: ${exportPath}`);
-  }
+  // import/exportメソッドは削除（メモリ内インデックスのみ使用）
 
   /**
    * ファイル更新時の増分更新
@@ -186,20 +148,9 @@ export class Indexer {
   /**
    * 特定ファイルのチャンクを削除
    */
-  private async removeFileChunks(_filePath: string): Promise<void> {
-    // TODO: FlexBackendに全チャンクIDを取得するメソッドを追加するか、
-    // ここで該当ファイルのチャンクIDを特定する必要がある
-    // 現在は簡単な実装として、ファイル名ベースでIDを推測
-
-    // ファイルに関連するチャンクIDを収集（将来改善が必要）
-    const chunkIds: string[] = [];
-    // TODO: 実際のチャンクID収集ロジックを実装
-    // 現在は仮実装として空配列を返す
-    // 将来的には filePath を使用してチャンクIDを特定する必要がある
-
-    if (chunkIds.length > 0) {
-      await this.backend.remove(chunkIds);
-    }
+  private async removeFileChunks(filePath: string): Promise<void> {
+    // removeByFileメソッドを使用してファイル単位で削除
+    await this.backend.removeByFile(filePath);
   }
 
   /**

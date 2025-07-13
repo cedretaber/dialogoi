@@ -1,6 +1,4 @@
-import { Document, Preset } from 'flexsearch';
-import fs from 'fs/promises';
-import path from 'path';
+import { Document, Preset, DocumentData } from 'flexsearch';
 import { SearchBackend, SearchResult, Chunk } from './SearchBackend.js';
 
 /**
@@ -8,17 +6,24 @@ import { SearchBackend, SearchResult, Chunk } from './SearchBackend.js';
  */
 interface FlexSearchConfig {
   profile: Preset;
-  exportPath: string;
 }
 
 /**
  * FlexSearchドキュメント型定義
  */
-interface FlexDocument {
-  id: string;
+interface FlexDocument extends DocumentData {
+  id: number;
   title: string;
   content: string;
-  tags?: string[];
+  tags: string[];
+  chunkId: {
+    originalId: string;
+    filePath: string;
+    startLine: number;
+    endLine: number;
+    chunkIndex: number;
+    hash: string;
+  };
 }
 
 /**
@@ -28,8 +33,8 @@ interface FlexDocument {
 export class FlexBackend extends SearchBackend {
   private index: Document<FlexDocument, true> | null = null;
   private config: FlexSearchConfig;
-  private chunks: Map<string, Chunk> = new Map();
   private isInitialized = false;
+  private nextId = 1; // 数値IDカウンタ
 
   constructor(config: FlexSearchConfig) {
     super();
@@ -46,10 +51,10 @@ export class FlexBackend extends SearchBackend {
 
     // Document Searchの設定（公式ドキュメントに従う）
     this.index = new Document({
-      preset: this.config.profile,
       document: {
         id: 'id',
         index: ['title', 'content', 'tags'],
+        tag: ['chunkId:filePath', 'tags'],
         store: true,
       },
     });
@@ -70,34 +75,25 @@ export class FlexBackend extends SearchBackend {
     // Document Searchにドキュメントを追加
     for (const chunk of chunks) {
       const document: FlexDocument = {
-        id: chunk.id,
+        id: this.nextId++,
         title: chunk.title,
         content: chunk.content,
-        tags: chunk.tags,
+        tags: chunk.tags || [],
+        chunkId: {
+          originalId: chunk.id,
+          filePath: chunk.filePath,
+          startLine: chunk.startLine,
+          endLine: chunk.endLine,
+          chunkIndex: chunk.chunkIndex,
+          hash: chunk.hash,
+        },
       };
 
       this.index.add(document);
-
-      // 内部マップに保存（メタデータ用）
-      this.chunks.set(chunk.id, chunk);
     }
   }
 
-  /**
-   * チャンクをインデックスから削除
-   */
-  async remove(ids: string[]): Promise<void> {
-    await this.initializeIndex();
-
-    if (!this.index) {
-      throw new Error('Index not initialized');
-    }
-
-    for (const id of ids) {
-      this.index.remove(id);
-      this.chunks.delete(id);
-    }
-  }
+  // removeメソッドは削除（removeByFileで置き換え）
 
   /**
    * 検索を実行
@@ -107,49 +103,32 @@ export class FlexBackend extends SearchBackend {
       throw new Error('Index not initialized');
     }
 
-    // Document Searchで検索実行（まずsimpleモードで試す）
-    const simpleResults = this.index.search(query, Math.min(k, 100));
-
-    // simpleモードの結果をenrichedに変換
-    const searchResults = simpleResults.map((fieldResult) => ({
-      field: fieldResult.field,
-      result: fieldResult.result
-        .map((id) => {
-          const doc = this.getDocumentById(String(id));
-          return {
-            id: [id],
-            doc: doc,
-          };
-        })
-        .filter((item) => item.doc !== null),
-    }));
+    // Document Searchで検索実行（enrichedモードでドキュメントも取得）
+    const searchResults = await this.index.search(query, {
+      limit: Math.min(k, 100),
+      enrich: true,
+    });
 
     const results: SearchResult[] = [];
 
-    // 検索結果を処理（FlexSearchのDocument Searchの結果形式）
+    // 検索結果を処理（FlexSearch 0.8のenriched結果形式）
     if (Array.isArray(searchResults)) {
       for (const fieldResult of searchResults) {
         if (fieldResult && 'result' in fieldResult) {
           for (const item of fieldResult.result) {
-            if (item && 'id' in item && 'doc' in item) {
-              // idは配列なので最初の要素を使用
-              const idArray = item.id;
-              const docId = Array.isArray(idArray) ? idArray[0] : idArray;
-              const chunk = this.chunks.get(String(docId));
-
-              if (chunk && item.doc) {
-                results.push({
-                  id: String(docId),
-                  score: this.normalizeScore(1.0), // FlexSearchの内部スコアを使用
-                  snippet: this.generateSnippet(item.doc.content, query),
-                  payload: {
-                    file: chunk.metadata.file,
-                    start: chunk.metadata.startLine,
-                    end: chunk.metadata.endLine,
-                    tags: chunk.tags,
-                  },
-                });
-              }
+            if (item && 'doc' in item && item.doc) {
+              const doc = item.doc as FlexDocument;
+              results.push({
+                id: doc.chunkId.originalId,
+                score: this.normalizeScore(1.0), // FlexSearchの内部スコアを使用
+                snippet: this.generateSnippet(doc.content, query),
+                payload: {
+                  file: doc.chunkId.filePath,
+                  start: doc.chunkId.startLine,
+                  end: doc.chunkId.endLine,
+                  tags: doc.tags,
+                },
+              });
             }
           }
         }
@@ -159,22 +138,7 @@ export class FlexBackend extends SearchBackend {
     return results.slice(0, k);
   }
 
-  /**
-   * IDでドキュメントを取得
-   */
-  private getDocumentById(id: string): FlexDocument | null {
-    const chunk = this.chunks.get(id);
-    if (!chunk) {
-      return null;
-    }
-
-    return {
-      id: chunk.id,
-      title: chunk.title,
-      content: chunk.content,
-      tags: chunk.tags,
-    };
-  }
+  // getDocumentByIdメソッドは削除（enriched searchで置き換え）
 
   /**
    * スコアを0-1の範囲に正規化
@@ -223,90 +187,7 @@ export class FlexBackend extends SearchBackend {
     return snippet;
   }
 
-  /**
-   * インデックスをエクスポート（永続化）
-   */
-  async exportIndex(exportPath?: string): Promise<void> {
-    await this.initializeIndex();
-
-    if (!this.index) {
-      throw new Error('Index not initialized');
-    }
-
-    const targetPath = exportPath || this.config.exportPath;
-
-    // ディレクトリが存在しない場合は作成
-    const dir = path.dirname(targetPath);
-    await fs.mkdir(dir, { recursive: true });
-
-    try {
-      // FlexSearchの公式ドキュメントに従ったexport
-      const indexData: Record<string, FlexDocument> = {};
-
-      await this.index.export((id, doc) => {
-        indexData[String(id)] = doc;
-      });
-
-      // チャンクメタデータも含めて保存
-      const exportData = {
-        version: '1.0',
-        timestamp: new Date().toISOString(),
-        index: indexData,
-        chunks: Array.from(this.chunks.entries()),
-        config: this.config,
-      };
-
-      await fs.writeFile(targetPath, JSON.stringify(exportData, null, 2), 'utf-8');
-    } catch (error) {
-      throw new Error(
-        `Failed to export index: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
-    }
-  }
-
-  /**
-   * インデックスをインポート（復元）
-   */
-  async importIndex(importPath?: string): Promise<void> {
-    const targetPath = importPath || this.config.exportPath;
-
-    try {
-      const data = await fs.readFile(targetPath, 'utf-8');
-      const exportData = JSON.parse(data);
-
-      // バージョンチェック
-      if (exportData.version !== '1.0') {
-        throw new Error(`Unsupported index version: ${exportData.version}`);
-      }
-
-      // インデックスを初期化
-      await this.initializeIndex();
-
-      if (!this.index) {
-        throw new Error('Index not initialized');
-      }
-
-      // FlexSearchの公式ドキュメントに従ったimport
-      for (const [id, doc] of Object.entries(exportData.index) as [string, FlexDocument][]) {
-        await this.index.import(id, doc);
-      }
-
-      // チャンクメタデータを復元
-      this.chunks.clear();
-      for (const [id, chunk] of exportData.chunks) {
-        this.chunks.set(id, chunk);
-      }
-    } catch (error) {
-      if (error instanceof Error && error.message.includes('ENOENT')) {
-        // ファイルが存在しない場合は新しいインデックスを作成
-        await this.initializeIndex();
-        return;
-      }
-      throw new Error(
-        `Failed to import index: ${error instanceof Error ? error.message : 'Unknown error'}`,
-      );
-    }
-  }
+  // import/exportメソッドは削除（ファイル再スキャンの方が効率的）
 
   /**
    * インデックスをクリア
@@ -320,22 +201,111 @@ export class FlexBackend extends SearchBackend {
 
     // 新しいインデックスを作成（実質的にクリア）
     this.isInitialized = false;
-    this.chunks.clear();
     await this.initializeIndex();
+  }
+
+  /**
+   * 指定ファイルに関連するチャンクをすべて削除
+   */
+  async removeByFile(filePath: string): Promise<void> {
+    await this.initializeIndex();
+
+    if (!this.index) {
+      throw new Error('Index not initialized');
+    }
+
+    // タグ機能を使ってファイルパスで検索
+    const searchResults = await this.index.search({
+      tag: { 'chunkId:filePath': filePath },
+      enrich: false,
+    });
+
+    // 該当するチャンクを削除
+    for (const result of searchResults) {
+      for (const id of result.result) {
+        this.index.remove(id);
+      }
+    }
+  }
+
+  /**
+   * チャンクを差分更新（ハッシュ値による重複チェック）
+   */
+  async updateChunks(chunks: Chunk[]): Promise<{
+    added: number;
+    updated: number;
+    unchanged: number;
+  }> {
+    await this.initializeIndex();
+
+    if (!this.index) {
+      throw new Error('Index not initialized');
+    }
+
+    let added = 0;
+    let updated = 0;
+    let unchanged = 0;
+
+    for (const chunk of chunks) {
+      const baseId = chunk.baseId;
+      const newHash = chunk.hash;
+
+      // 同じファイルパス、行範囲を持つ既存チャンクを検索
+      const searchResults = this.index.search({
+        tag: { 'chunkId:filePath': chunk.filePath },
+        enrich: true,
+      });
+
+      let existingDoc: FlexDocument | null = null;
+      let existingId: number | null = null;
+
+      // search結果からドキュメントを取得して確認
+      if (Array.isArray(searchResults)) {
+        for (const item of searchResults) {
+          if (item && 'doc' in item && item.doc) {
+            const doc = item.doc as FlexDocument;
+            if (doc.chunkId.originalId.startsWith(baseId + '@')) {
+              existingDoc = doc;
+              existingId = doc.id;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!existingDoc) {
+        // 新規チャンク
+        await this.add([chunk]);
+        added++;
+      } else {
+        // ハッシュ値比較
+        const existingHash = existingDoc.chunkId.hash;
+
+        if (newHash !== existingHash) {
+          // ハッシュが異なる場合は更新
+          this.index.remove(existingId!);
+          await this.add([chunk]);
+          updated++;
+        } else {
+          // ハッシュが同じ場合は変更なし
+          unchanged++;
+        }
+      }
+    }
+
+    return { added, updated, unchanged };
   }
 
   /**
    * インデックスの統計情報を取得
    */
   async getStats(): Promise<{
-    totalChunks: number;
     memoryUsage?: number;
     lastUpdated?: Date;
   }> {
     await this.initializeIndex();
 
     return {
-      totalChunks: this.chunks.size,
       memoryUsage: process.memoryUsage().heapUsed,
       lastUpdated: new Date(),
     };
@@ -356,7 +326,6 @@ export class FlexBackend extends SearchBackend {
       // FlexSearchにはdisposeメソッドがないため、参照をクリア
       this.index = null;
     }
-    this.chunks.clear();
     this.isInitialized = false;
   }
 }
