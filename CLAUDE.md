@@ -87,3 +87,14 @@ novels/
 - DIALOGOI.md ファイルはプロジェクト固有の AI ガイドラインを提供
 - サーバーは厳格な ESLint ルールを使用（警告0個必須）
 - テストは vitest フレームワークを使用
+
+## **重要：作業完了前の必須チェック**
+
+**新しいファイルを作成・編集した後は、必ず以下のコマンドを実行してCIの通過を確保すること：**
+
+1. `npm run lint` - ESLint チェック（警告0個必須）
+2. `npm run format` - Prettier フォーマット
+3. `npm run typecheck` - TypeScript 型チェック
+4. `npm test` - 全テストの実行
+
+これらのチェックを怠ると GitHub Actions CI が失敗する。コミット前に必ず実行すること。
