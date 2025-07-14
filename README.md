@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/cedretaber/dialogoi/actions/workflows/ci.yml/badge.svg)](https://github.com/cedretaber/dialogoi/actions/workflows/ci.yml)
 
-小説執筆を支援するMCP（Model Context Protocol）サーバです。
+小説執筆を支援するRAG搭載MCP（Model Context Protocol）サーバです。FlexSearchによる高速な日本語全文検索機能を提供し、小説の設定や本文を横断的に検索できます。
 
 ## インストール
 
@@ -123,7 +123,7 @@ novels/
 
 #### 5. `add_novel_setting`
 
-設定ファイルを新規作成（セキュリティ機能付き）
+設定ファイルを新規作成
 
 **パラメータ:**
 
@@ -167,7 +167,7 @@ novels/
 
 #### 9. `add_novel_content`
 
-本文ファイルを新規作成（セキュリティ機能付き）
+本文ファイルを新規作成
 
 **パラメータ:**
 
@@ -195,6 +195,28 @@ novels/
 
 - `novelId`: 小説のID
 - `filename`: ファイル名（省略時は全指示ファイルを結合）
+
+### RAG検索機能
+
+#### 12. `search_rag` 🔍 **高度な全文検索**
+
+プロジェクト全体から関連テキストチャンクをRAG検索
+
+**パラメータ:**
+
+- `novelId`: 小説のID
+- `query`: 検索クエリ（自然言語）
+- `k`: 取得する結果数（省略時: 10、最大: 50）
+
+**使用例:** "主人公が魔法を使うシーン"
+
+**RAG検索の特徴:**
+- **形態素解析**: kuromojinによる日本語解析で高精度検索
+- **マルチフィールド検索**: 表層形・基本形・読みで横断検索
+- **スマートチャンキング**: 20%オーバーラップで文脈を保持
+- **品詞別スコアリング**: 名詞(1.0)、動詞(0.8)、形容詞(0.7)で重み付け
+- **コンテキスト表示**: マッチ箇所の前後最大240文字を抽出
+- **LLM最適化**: Markdown引用形式で結果を整形
 
 ## セキュリティ機能
 
@@ -230,10 +252,10 @@ Claude Desktopでの実際の使用例：
 
 ```
 4. "魔法システムについて設定ファイルから調べて"
-   → search_novel_settings で魔法関連の設定を検索
+   → search_novel_settings で魔法関連の設定を検索（単純検索）
 
 5. "主人公が出てくる場面を本文から探して"
-   → search_novel_content で主人公の登場箇所を検索
+   → search_novel_content で主人公の登場箇所を検索（単純検索）
 ```
 
 ### ファイル作成機能

@@ -18,16 +18,20 @@
 
 ```mermaid
 flowchart TD
-    A["watcher.ts(chokidar)"] -->|diff chunks| IDX["indexer.ts(FlexBackend)"]
+    A["watcher.ts(chokidar)"] -->|diff chunks| IDX["indexer.ts(KeywordFlexBackend)"]
+    subgraph MCP Layer
+      NS[NovelService] -->|search| IM[IndexerManager]
+      IM -->|manage| IDX
+    end
     subgraph API Layer
-      SR[search_rag.ts] -->|query| IDX
-      SR -->|results| LLM
+      SR[search_novel_settings/content] -->|query| NS
     end
 ```
 
-- **`watcher.ts`** ― ファイルシステム監視。追加 / 変更 / 削除イベントを発火。
-- **`indexer.ts` / FlexBackend** ― FlexSearch `Document` インデックスを生成・維持する。
-- **`search_rag.ts`** ― MCP ツールとして公開。`search_rag(query, k)` を提供。
+- **`watcher.ts`** ― ファイルシステム監視。追加 / 変更 / 削除イベントを発火。（実装予定）
+- **`indexer.ts` / KeywordFlexBackend** ― FlexSearch `Document` インデックスを生成・維持する。
+- **`NovelService`** ― 小説プロジェクト管理とMCPツールの実装。
+- **`IndexerManager`** ― 複数の小説プロジェクトのインデックスを管理。
 
 > **注** バックエンドは `SearchBackend` 抽象を介して呼び出す。フェーズ 2 で `HybridBackend` を差し替えても呼び出し側は無変更。
 
@@ -35,20 +39,50 @@ flowchart TD
 
 ## 3 データモデル
 
-| フィールド | 型         | 説明                                                         |
-| ---------- | ---------- | ------------------------------------------------------------ |
-| `id`       | `string`   | `file::section::para-N::chunk-M[@hash]` ― グローバル一意キー |
-| `title`    | `string`   | 章・節タイトル（重み付け 3）                                 |
-| `content`  | `string`   | チャンク本文（200–400 トークン）                             |
-| `tags`     | `string[]` | オプション ― 例: `伏線:追跡装置`                             |
+### 3.1 Chunkクラス
 
-**FlexSearch 設定例**
+```ts
+export class Chunk {
+  constructor(
+    public title: string,      // 章・節タイトル
+    public content: string,    // チャンク本文
+    public filePath: string,   // ファイルパス
+    public startLine: number,  // 開始行番号
+    public endLine: number,    // 終了行番号
+    public chunkIndex: number, // チャンク番号
+    public novelId: string,    // 小説プロジェクトID
+    public tags?: string[]     // オプションのタグ
+  ) {}
+
+  get baseId(): string // ハッシュなしのベースID
+  get id(): string     // ハッシュ付きの一意ID
+  get hash(): string   // タイトル+コンテンツのMD5ハッシュ（8文字）
+}
+```
+
+### 3.2 WordDocument（形態素解析結果）
+
+| フィールド | 型       | 説明                       |
+| ---------- | -------- | -------------------------- |
+| `id`       | `number` | ユニークID                 |
+| `word`     | `string` | 表層形                     |
+| `basic`    | `string` | 基本形                     |
+| `reading`  | `string` | 読み（カタカナ）           |
+| `pos`      | `string` | 品詞                       |
+| `chunkId`  | `string` | 所属チャンクID             |
+| `novelId`  | `string` | 小説プロジェクトID         |
+
+**FlexSearch 設定（KeywordFlexBackend）**
 
 ```ts
 document: {
-  id: "id",
-  index: ["title", "content", "tags"],
-  tag: ["chunkId:filePath", "tags"],
+  id: 'id',
+  index: [
+    { field: 'word', tokenize: 'reverse' },     // 前後部分一致
+    { field: 'basic', tokenize: 'reverse' },    // 基本形検索
+    { field: 'reading', tokenize: 'reverse' }   // 読み検索
+  ],
+  tag: ['chunkId', 'filePath', 'novelId'],
   store: true
 }
 ```
@@ -59,32 +93,46 @@ document: {
 
 | パッケージ            | バージョン | 用途                       |
 | --------------------- | ---------- | -------------------------- |
-| `flexsearch`          | ^0.8.205   | 全文検索 (Document Search) |
-| `chokidar`            | ^4.0.3     | ファイル監視               |
-| `ts-node` / `esbuild` | latest     | dev ランタイム / バンドル  |
+| `flexsearch`          | ^0.8.2     | 全文検索 (Document Search) |
+| `kuromojin`           | ^3.0.1     | 日本語形態素解析           |
+| `@modelcontextprotocol/sdk` | ^1.12.3 | MCPサーバー実装      |
+| `dotenv`              | ^16.4.5    | 環境変数管理               |
+| `zod`                 | ^3.25.67   | スキーマ検証               |
 
-Node 20 以上で `worker_threads` が標準利用可能。
+Node 20 以上で標準機能を活用。
 
 ---
 
 ## 5 プロジェクト構成
 
 ```
-Dialogoi/
+dialogoi/
 ├─ src/
 │  ├─ backends/
-│  │   ├─ SearchBackend.ts      # 抽象 IF
-│  │   └─ FlexBackend.ts        # フェーズ1実装
-│  ├─ tools/
-│  │   └─ search_rag.ts         # MCP ツール
+│  │   ├─ SearchBackend.ts      # 抽象インターフェース
+│  │   └─ KeywordFlexBackend.ts # 形態素解析ベース実装
+│  ├─ services/
+│  │   └─ novelService.ts       # 小説プロジェクト管理
 │  ├─ lib/
 │  │   ├─ chunker.ts            # 再帰チャンク化ヘルパ
-│  │   └─ watcher.ts            # chokidar ラッパー
-│  └─ indexer.ts                # インデックス管理
+│  │   ├─ morphAnalyzer.ts      # 日本語形態素解析
+│  │   ├─ indexerManager.ts     # インデックス管理
+│  │   └─ config.ts             # 設定管理
+│  ├─ utils/
+│  │   └─ fileUtils.ts          # ファイル操作ユーティリティ
+│  ├─ domain/
+│  │   └─ novel.ts              # ドメインモデル
+│  ├─ dto/
+│  │   └─ novelDto.ts           # MCPレスポンス型定義
+│  ├─ indexer.ts                # 単一インデックス管理
+│  └─ index.ts                  # MCPサーバーエントリポイント
 ├─ config/
-│  └─ dialogoi.config.json
+│  └─ dialogoi.config.json      # 設定ファイル
+├─ novels/                      # 小説プロジェクトディレクトリ
+│  ├─ sample_novel/
+│  └─ mystery_story/
 └─ test/
-   └─ search_rag.spec.ts
+   └─ *.test.ts                 # vitest テストファイル
 ```
 
 ---
@@ -94,20 +142,27 @@ Dialogoi/
 ### 6.1 起動時
 
 1. `dialogoi.config.json` をロード（コマンドライン引数で上書き可能）。
-2. **`*.md` / `*.txt`** を全走査 → `chunker.ts` → `add()`。
-3. インデックスはメモリ内に保持（≈50 k チャンクで 3 秒未満）。
+2. MCPサーバーとして起動、NovelServiceが小説プロジェクトを検出。
+3. IndexerManagerが各プロジェクトのインデックスを管理（遅延初期化）。
 
-### 6.2 ライブ更新
+### 6.2 インデックス構築（初回検索時）
+
+1. 対象プロジェクトの **`*.md` / `*.txt`** を全走査。
+2. `MarkdownChunkingStrategy` でチャンク化（20%オーバーラップ）。
+3. `KeywordFlexBackend` で形態素解析 → 単語単位でインデックス。
+4. メモリ内に保持（高速検索を実現）。
+
+### 6.3 ライブ更新（実装予定）
 
 1. `watcher.ts` が FS イベントを受信。
 2. 差分計算 → 追加／削除チャンクを抽出。
-3. `removeByFile()` / `add()` でメモリ内インデックスを更新。
-4. 1 秒デバウンスで変更を反映。
+3. `removeByFile()` / `updateChunks()` でメモリ内インデックスを更新。
+4. デバウンスで変更を反映。
 
-### 6.3 クエリ
+### 6.4 検索フロー
 
 ```
-search_rag(query, k) -> backend.search(query, k)
+MCPツール → NovelService.searchRag() → IndexerManager → KeywordFlexBackend
 ```
 
 戻り値:
@@ -115,51 +170,55 @@ search_rag(query, k) -> backend.search(query, k)
 ```ts
 {
   id: string,
-  score: number,    // 0–1
-  snippet: string,  // 周辺 120 文字
-  payload: { file, start, end, tags }
+  score: number,    // 0–1 正規化スコア
+  snippet: string,  // マッチ箇所の周辺テキスト
+  payload: { 
+    file: string,
+    start: number,
+    end: number,
+    tags?: string[]
+  }
 }
 ```
-
-MCP ラッパーが Markdown `> 引用` に整形して LLM プロンプトに挿入。
 
 ---
 
 ## 7 実装チェックリスト
 
-- [x] **chunker.ts** ― 再帰チャンク化 (見出し → 段落) + 20 % オーバーラップ ✅ **完了**
-- [x] **FlexBackend.ts** ― Document Search API + メモリ内インデックス ✅ **完了**
-- [x] **indexer.ts** ― インデックス管理とフルビルド機能 ✅ **完了**
-- [ ] **search_rag.ts** ― MCP ツールとして公開 📋 **次のタスク**
-- [ ] **watcher.ts** ― chokidarを使ったファイル監視 📋 **予定**
-- [ ] **Unit tests** (vitest) ― precision@k, hot-update動作テスト 📋 **予定**
+### フェーズ1完了項目 ✅
 
-### 現在の進捗状況 (2025-01-13)
+- [x] **chunker.ts** ― MarkdownChunkingStrategy (20%オーバーラップ)
+- [x] **KeywordFlexBackend.ts** ― 形態素解析ベース全文検索
+- [x] **morphAnalyzer.ts** ― kuromojinによる日本語解析
+- [x] **indexer.ts** ― 単一プロジェクトのインデックス管理
+- [x] **indexerManager.ts** ― 複数プロジェクトの管理
+- [x] **novelService.ts** ― MCPツール実装とRAG検索統合
+- [x] **fileUtils.ts** ― ファイル操作ユーティリティ
+- [x] **config.ts** ― CLI引数対応の設定管理
+- [x] **MCPサーバー統合** ― search_novel_settings/content実装
 
-**完了済み:**
+### 実装予定項目 📋
 
-1. **chunker.ts実装** - MarkdownChunkingStrategy with 20% overlap, 25テスト全て成功
-2. **FlexBackend.ts実装** - Document Search API, タグ検索対応, 21テスト全て成功
-3. **indexer.ts実装** - インデックス管理、ファイル走査、メモリ内インデックス, 14テスト全て成功
+- [ ] **watcher.ts** ― chokidarを使ったファイル監視
+- [ ] **ホットリロード** ― ファイル変更の自動反映
+- [ ] **インデックス永続化** ― 起動時間の短縮
 
-**次のタスク:** 4. **search_rag.ts実装** - MCP ツールとして公開
+### 現在の進捗状況 (2025-01-14)
 
-**アーキテクチャ設計変更（2025-01-13リファクタリング）:**
+**アーキテクチャの主な特徴:**
 
-- **FlexSearch 0.8.205にアップグレード** - Document Search APIで最新機能を活用
-- **Chunkをクラス化** - getter方式でid/hash/baseIdを動的生成、型安全性向上
-- **import/export機能削除** - ファイル再スキャンの方が効率的、メモリ内インデックス採用
-- **タグを検索対象に追加** - 部分一致でタグ・タイトル・コンテンツを横断検索
-- **メモリ効率化** - 冗長なchunks Mapを削除、FlexSearchのstore機能を活用
-- **removeByFile実装** - タグ機能を使ったファイル単位削除が正常動作
+1. **形態素解析ベース検索** - kuromojinで日本語を解析し、表層形・基本形・読みで検索
+2. **MCPサーバー統合** - NovelServiceがMCPツールを提供、既存APIと完全互換
+3. **遅延インデックス** - 初回検索時にインデックス構築、メモリ効率的
+4. **抽象化設計** - SearchBackendインターフェースで将来のベクトル検索に対応
 
-**技術的な知見:**
+**技術的な実装詳細:**
 
-- FlexSearchのDocument Search APIはstore: trueが必須
-- タグを検索インデックスに含めることで小説執筆に最適化された直感的検索を実現
-- TypeScript型安全性を'any'型なしで維持（DocumentData継承による型適合）
-- 隠しディレクトリ（.\*/\*\*）のみ除外して小説プロジェクトファイルを検索
-- FlexSearchのタグシステムでネストプロパティ検索が可能
+- **FlexSearch Document API** - 単語単位でインデックス、reverse tokenizeで部分一致
+- **スニペット生成** - マッチ位置から前後の文脈を抽出（最大240文字）
+- **スコアリング** - 品詞による重み付け（名詞1.0、動詞0.8、形容詞0.7）
+- **並列チャンク処理** - Promise.allで効率的なインデックス構築
+- **型安全性** - any型を排除、TypeScript strictモード準拠
 
 ---
 
