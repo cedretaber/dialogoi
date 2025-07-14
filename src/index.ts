@@ -3,7 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import dotenv from 'dotenv';
 import { z } from 'zod';
 import { NovelService } from './services/novelService.js';
-import { Indexer } from './indexer.js';
+import { IndexerManager } from './lib/indexerManager.js';
 import path from 'path';
 import { loadConfig } from './lib/config.js';
 
@@ -27,9 +27,11 @@ console.error(
 
 const novelService = new NovelService(baseDir);
 
-// RAG検索用のIndexerを初期化（後でmain関数内で実行）
-// TODO: 将来的にはプロジェクト別にIndexerを管理する
-const indexer = new Indexer(dialogoiConfig, 'default-novel');
+// RAG検索用のIndexerManagerを初期化
+const indexerManager = new IndexerManager(dialogoiConfig);
+
+// NovelServiceにIndexerManagerを設定
+novelService.setIndexerManager(indexerManager);
 
 const server = new McpServer({
   name: 'Dialogoi',
@@ -450,9 +452,11 @@ server.registerTool(
       // k値を制限内に収める
       const limitedK = Math.min(k, maxK);
 
-      console.error(`🔍 RAG検索実行: query="${params.query}", k=${limitedK}`);
+      console.error(
+        `🔍 RAG検索実行: novelId="${params.novelId}", query="${params.query}", k=${limitedK}`,
+      );
 
-      const searchResults = await indexer.search(params.query, limitedK, params.novelId);
+      const searchResults = await indexerManager.search(params.novelId, params.query, limitedK);
 
       if (searchResults.length === 0) {
         return {
@@ -497,10 +501,8 @@ server.registerTool(
 );
 
 async function main() {
-  // RAG検索インデックスを初期化
-  console.error('🔍 RAG検索インデックスを初期化中...');
-  await indexer.initialize();
-  console.error('✅ RAG検索インデックス初期化完了');
+  // IndexerManagerは遅延初期化（各小説プロジェクトのIndexerは最初のリクエスト時に作成）
+  console.error('🔍 IndexerManagerを初期化しました（小説プロジェクト別のIndexerは遅延作成）');
 
   const transport = new StdioServerTransport();
   await server.connect(transport);

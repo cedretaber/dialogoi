@@ -164,9 +164,17 @@ export class Indexer {
   }
 
   /**
+   * バックエンドが準備完了かチェック
+   */
+  isReady(): boolean {
+    return this.backend.isReady();
+  }
+
+  /**
    * リソースのクリーンアップ
    */
   async cleanup(): Promise<void> {
     // 必要に応じてバックエンドのクリーンアップ処理
+    await this.backend.dispose();
   }
 }

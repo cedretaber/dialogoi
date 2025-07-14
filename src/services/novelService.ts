@@ -1,19 +1,24 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { NovelConfig, NovelProject } from '../domain/novel.js';
-import {
-  fileExists,
-  readFileWithPreview,
-  findFilesRecursively,
-  ensureDirectory,
-} from '../utils/fileUtils.js';
+import { fileExists, findFilesRecursively, ensureDirectory } from '../utils/fileUtils.js';
+import { IndexerManager } from '../lib/indexerManager.js';
 
 export class NovelService {
   private readonly baseDir: string;
   private novelProjects: Map<string, NovelProject> = new Map();
+  private indexerManager?: IndexerManager;
 
   constructor(baseDir?: string) {
     this.baseDir = baseDir || path.join(process.cwd(), 'novels');
+  }
+
+  /**
+   * IndexerManagerを設定（オプション）
+   * @param indexerManager IndexerManager インスタンス
+   */
+  setIndexerManager(indexerManager: IndexerManager): void {
+    this.indexerManager = indexerManager;
   }
 
   // 小説プロジェクトを発見・読み込み
@@ -262,7 +267,7 @@ export class NovelService {
       if (!exists) continue;
 
       try {
-        const { preview } = await readFileWithPreview(filePath, project.path);
+        const { preview } = await this.readFileWithPreview(filePath, project.path);
         results.push({ filename: relative, preview });
       } catch {
         // 読み込み失敗はスキップ
@@ -394,6 +399,15 @@ export class NovelService {
 
     // ファイル作成
     await fs.writeFile(filePath, content, 'utf-8');
+
+    // IndexerManagerが設定されている場合、インデックスを更新
+    if (this.indexerManager) {
+      try {
+        await this.indexerManager.updateFile(novelId, filePath);
+      } catch (error) {
+        console.error(`⚠️ Indexer更新エラー: ${filePath}`, error);
+      }
+    }
   }
 
   // 本文ファイルを追加
@@ -429,6 +443,15 @@ export class NovelService {
 
     // ファイル作成
     await fs.writeFile(filePath, content, 'utf-8');
+
+    // IndexerManagerが設定されている場合、インデックスを更新
+    if (this.indexerManager) {
+      try {
+        await this.indexerManager.updateFile(novelId, filePath);
+      } catch (error) {
+        console.error(`⚠️ Indexer更新エラー: ${filePath}`, error);
+      }
+    }
   }
 
   // ===== 共通メソッド =====
@@ -491,7 +514,7 @@ export class NovelService {
 
       for (const filePath of foundFiles) {
         try {
-          const fileData = await readFileWithPreview(filePath, project.path);
+          const fileData = await this.readFileWithPreview(filePath, project.path);
           files.push({
             filename: fileData.relativePath,
             preview: fileData.preview,
