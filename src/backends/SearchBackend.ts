@@ -26,6 +26,7 @@ export class Chunk {
     public startLine: number, // 開始行番号
     public endLine: number, // 終了行番号
     public chunkIndex: number, // チャンク番号
+    public novelId: string, // 小説プロジェクトID
     public tags?: string[], // オプションのタグ
   ) {}
 
@@ -87,9 +88,10 @@ export abstract class SearchBackend {
    * 検索を実行
    * @param query 検索クエリ
    * @param k 返す結果の最大数
+   * @param novelId 検索対象の小説ID
    * @returns 検索結果の配列
    */
-  abstract search(query: string, k: number): Promise<SearchResult[]>;
+  abstract search(query: string, k: number, novelId: string): Promise<SearchResult[]>;
 
   /**
    * インデックスをクリア

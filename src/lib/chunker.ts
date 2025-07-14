@@ -118,9 +118,16 @@ export interface ChunkingStrategy {
    * @param filePath ファイルパス
    * @param maxTokens チャンクあたりの最大トークン数
    * @param overlapRatio オーバーラップ比率（0-1）
+   * @param novelId 小説プロジェクトID
    * @returns チャンクの配列
    */
-  chunk(text: string, filePath: string, maxTokens: number, overlapRatio: number): Chunk[];
+  chunk(
+    text: string,
+    filePath: string,
+    maxTokens: number,
+    overlapRatio: number,
+    novelId: string,
+  ): Chunk[];
 }
 
 /**
@@ -133,7 +140,13 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     private splitStrategy: TextSplitStrategy = new SequentialSplitStrategy(),
   ) {}
 
-  chunk(text: string, filePath: string, maxTokens: number, overlapRatio: number): Chunk[] {
+  chunk(
+    text: string,
+    filePath: string,
+    maxTokens: number,
+    overlapRatio: number,
+    novelId: string,
+  ): Chunk[] {
     const lines = text.split('\n');
     const chunks: Chunk[] = [];
 
@@ -141,7 +154,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     const sections = this.extractSections(lines);
 
     for (const section of sections) {
-      const sectionChunks = this.chunkSection(section, filePath, maxTokens, overlapRatio);
+      const sectionChunks = this.chunkSection(section, filePath, maxTokens, overlapRatio, novelId);
       chunks.push(...sectionChunks);
     }
 
@@ -209,6 +222,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     filePath: string,
     maxTokens: number,
     overlapRatio: number,
+    novelId: string,
   ): Chunk[] {
     const sectionText = section.lines.join('\n');
     const sectionTokens = this.tokenCounter.count(sectionText);
@@ -219,12 +233,20 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     // セクション全体が最大トークン数以下で、かつ段落が1つ以下なら1つのチャンクとして返す
     if (sectionTokens <= maxTokens && paragraphs.length <= 1) {
       return [
-        new Chunk(section.title, sectionText, filePath, section.startLine, section.endLine, 0),
+        new Chunk(
+          section.title,
+          sectionText,
+          filePath,
+          section.startLine,
+          section.endLine,
+          0,
+          novelId,
+        ),
       ];
     }
 
     // セクションを段落単位で分割してチャンク化
-    return this.chunkByParagraphs(section, filePath, maxTokens, overlapRatio);
+    return this.chunkByParagraphs(section, filePath, maxTokens, overlapRatio, novelId);
   }
 
   /**
@@ -235,6 +257,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     filePath: string,
     maxTokens: number,
     overlapRatio: number,
+    novelId: string,
   ): Chunk[] {
     const chunks: Chunk[] = [];
     const paragraphs = this.extractParagraphs(section.lines);
@@ -260,6 +283,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
               currentStartLine,
               currentStartLine + currentChunkLines.length - 1,
               chunkIndex++,
+              novelId,
             ),
           );
 
@@ -288,6 +312,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
                 currentStartLine,
                 currentStartLine + currentChunkLines.length - 1,
                 chunkIndex++,
+                novelId,
               ),
             );
 
@@ -324,6 +349,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
                 currentStartLine,
                 currentStartLine + currentChunkLines.length - 1,
                 chunkIndex++,
+                novelId,
               ),
             );
 
@@ -359,6 +385,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
           currentStartLine,
           currentStartLine + currentChunkLines.length - 1,
           chunkIndex,
+          novelId,
         ),
       );
     }

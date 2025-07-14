@@ -11,7 +11,6 @@ export interface DialogoiConfig {
   };
   flex: {
     profile: 'fast' | 'match' | 'score' | 'default';
-    exportPath: string;
   };
   search: {
     defaultK: number;
@@ -29,7 +28,6 @@ const DEFAULT_CONFIG: DialogoiConfig = {
   },
   flex: {
     profile: 'fast',
-    exportPath: './cache/index.json',
   },
   search: {
     defaultK: 10,

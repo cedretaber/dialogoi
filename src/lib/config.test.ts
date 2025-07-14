@@ -86,7 +86,6 @@ describe('Config Loader', () => {
       },
       flex: {
         profile: 'fast',
-        exportPath: './cache/index.json',
       },
       search: {
         defaultK: 10,

@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import dotenv from 'dotenv';
 import { z } from 'zod';
 import { NovelService } from './services/novelService.js';
+import { Indexer } from './indexer.js';
 import path from 'path';
 import { loadConfig } from './lib/config.js';
 
@@ -25,6 +26,10 @@ console.error(
 );
 
 const novelService = new NovelService(baseDir);
+
+// RAG検索用のIndexerを初期化（後でmain関数内で実行）
+// TODO: 将来的にはプロジェクト別にIndexerを管理する
+const indexer = new Indexer(dialogoiConfig, 'default-novel');
 
 const server = new McpServer({
   name: 'Dialogoi',
@@ -217,6 +222,12 @@ const listNovelInstructionsInput = z.object({
 const getNovelInstructionsInput = z.object({
   novelId: z.string().describe('小説のID'),
   filename: z.string().optional().describe('指示ファイル名（省略時は全ファイル結合）'),
+});
+
+const searchRagInput = z.object({
+  novelId: z.string().describe('小説のID'),
+  query: z.string().describe('検索クエリ（自然言語）'),
+  k: z.number().int().min(1).max(50).optional().describe('返す結果の最大数（デフォルト: 10）'),
 });
 
 // 小説プロジェクト一覧を取得するツール
@@ -423,7 +434,74 @@ server.registerTool(
   },
 );
 
+// RAG検索ツール
+server.registerTool(
+  'search_rag',
+  {
+    description:
+      'プロジェクト全体から関連テキストチャンクを検索します（RAG検索）。自然言語クエリでタイトル・本文・タグを横断検索し、LLMプロンプトに最適化されたMarkdown形式で結果を返します。',
+    inputSchema: searchRagInput.shape,
+  },
+  async (params: { novelId: string; query: string; k?: number }) => {
+    try {
+      const k = params.k || dialogoiConfig.search.defaultK;
+      const maxK = dialogoiConfig.search.maxK;
+
+      // k値を制限内に収める
+      const limitedK = Math.min(k, maxK);
+
+      console.error(`🔍 RAG検索実行: query="${params.query}", k=${limitedK}`);
+
+      const searchResults = await indexer.search(params.query, limitedK, params.novelId);
+
+      if (searchResults.length === 0) {
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `クエリ「${params.query}」に一致するコンテンツが見つかりませんでした。\n\n別のキーワードをお試しください。`,
+            },
+          ],
+        };
+      }
+
+      console.error(`✅ RAG検索完了: ${searchResults.length}件の結果`);
+
+      // Markdown引用形式でLLMプロンプトに最適化
+      const formattedResults = searchResults
+        .map((result, index) => {
+          const header = `**結果 ${index + 1}** (スコア: ${result.score.toFixed(3)}, ファイル: ${result.payload.file})`;
+          const tags =
+            result.payload.tags && result.payload.tags.length > 0
+              ? `\n*タグ: ${result.payload.tags.join(', ')}*`
+              : '';
+          const snippet = result.snippet;
+
+          return `${header}${tags}\n> ${snippet.replace(/\n/g, '\n> ')}`;
+        })
+        .join('\n\n');
+
+      const summary = `## RAG検索結果\n\n**クエリ:** ${params.query}\n**結果数:** ${searchResults.length}/${limitedK}\n\n${formattedResults}`;
+
+      return {
+        content: [{ type: 'text' as const, text: summary }],
+      };
+    } catch (error) {
+      console.error('❌ RAG検索エラー:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
+      return {
+        content: [{ type: 'text' as const, text: `RAG検索エラー: ${errorMsg}` }],
+      };
+    }
+  },
+);
+
 async function main() {
+  // RAG検索インデックスを初期化
+  console.error('🔍 RAG検索インデックスを初期化中...');
+  await indexer.initialize();
+  console.error('✅ RAG検索インデックス初期化完了');
+
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error('Dialogoi MCP Server started');

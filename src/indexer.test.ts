@@ -7,7 +7,7 @@ import { glob } from 'glob';
 // モックの設定
 vi.mock('fs/promises');
 vi.mock('glob');
-vi.mock('./backends/FlexBackend.js');
+vi.mock('./backends/KeywordFlexBackend.js');
 
 describe('Indexer', () => {
   let indexer: Indexer;
@@ -26,7 +26,6 @@ describe('Indexer', () => {
       },
       flex: {
         profile: 'match',
-        exportPath: '/test/project/.index/flex.json',
       },
       search: {
         defaultK: 10,
@@ -34,7 +33,7 @@ describe('Indexer', () => {
       },
     };
 
-    indexer = new Indexer(mockConfig);
+    indexer = new Indexer(mockConfig, 'test-novel-id');
   });
 
   afterEach(() => {
@@ -207,9 +206,13 @@ describe('Indexer', () => {
       const mockBackend = (indexer as unknown as { backend: MockBackend }).backend;
       mockBackend.search = vi.fn().mockResolvedValueOnce(mockResults);
 
-      const results = await indexer.search('test query');
+      const results = await indexer.search('test query', 10, 'test-novel-id');
 
-      expect(mockBackend.search).toHaveBeenCalledWith('test query', mockConfig.search.defaultK);
+      expect(mockBackend.search).toHaveBeenCalledWith(
+        'test query',
+        mockConfig.search.defaultK,
+        'test-novel-id',
+      );
       expect(results).toEqual(mockResults);
     });
 
@@ -219,9 +222,9 @@ describe('Indexer', () => {
       const mockBackend = (indexer as unknown as { backend: MockBackend }).backend;
       mockBackend.search = vi.fn().mockResolvedValueOnce([]);
 
-      await indexer.search('test query', 20);
+      await indexer.search('test query', 20, 'test-novel-id');
 
-      expect(mockBackend.search).toHaveBeenCalledWith('test query', 20);
+      expect(mockBackend.search).toHaveBeenCalledWith('test query', 20, 'test-novel-id');
     });
   });
 

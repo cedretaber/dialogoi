@@ -114,7 +114,7 @@ describe('MarkdownChunkingStrategy', () => {
     it('短いテキストは1つのチャンクになる', () => {
       const text = 'Short text content.';
       const filePath = 'test.md';
-      const chunks = strategy.chunk(text, filePath, 100, 0.2);
+      const chunks = strategy.chunk(text, filePath, 100, 0.2, 'test-novel-id');
 
       expect(chunks).toHaveLength(1);
       expect(chunks[0].content).toBe(text);
@@ -130,7 +130,7 @@ This is the first paragraph.
 
 This is the second paragraph.`;
 
-      const chunks = strategy.chunk(text, 'test.md', 100, 0.2);
+      const chunks = strategy.chunk(text, 'test.md', 100, 0.2, 'test-novel-id');
 
       expect(chunks).toHaveLength(1);
       expect(chunks[0].title).toBe('Chapter 1');
@@ -150,7 +150,7 @@ Section content.
 
 Second chapter content.`;
 
-      const chunks = strategy.chunk(text, 'test.md', 100, 0.2);
+      const chunks = strategy.chunk(text, 'test.md', 100, 0.2, 'test-novel-id');
 
       // セクション数に応じてチャンクが作成される
       expect(chunks.length).toBeGreaterThanOrEqual(2);
@@ -169,7 +169,7 @@ Second chapter content.`;
 
 ${longText}`;
 
-      const chunks = strategy.chunk(text, 'test.md', 80, 0.2);
+      const chunks = strategy.chunk(text, 'test.md', 80, 0.2, 'test-novel-id');
 
       // 長いテキストが複数のチャンクに分割されることを確認
       expect(chunks.length).toBeGreaterThan(1);
@@ -195,7 +195,7 @@ Paragraph 2 content.
 
 Paragraph 3 content.`;
 
-      const chunks = strategy.chunk(text, 'test.md', 15, 0.1); // より小さなmaxTokensとオーバーラップ
+      const chunks = strategy.chunk(text, 'test.md', 15, 0.1, 'test-novel-id'); // より小さなmaxTokensとオーバーラップ
 
       expect(chunks.length).toBeGreaterThan(1);
 
@@ -222,7 +222,7 @@ ${paragraph1}
 
 ${paragraph2}`;
 
-      const chunks = strategy.chunk(text, 'test.md', 100, 0.2);
+      const chunks = strategy.chunk(text, 'test.md', 100, 0.2, 'test-novel-id');
 
       if (chunks.length > 1) {
         // 隣接するチャンクに重複があることを確認
@@ -237,7 +237,7 @@ ${paragraph2}`;
     it('正しいID形式を生成', () => {
       const text = 'Test content';
       const filePath = 'test/example.md';
-      const chunks = strategy.chunk(text, filePath, 100, 0.2);
+      const chunks = strategy.chunk(text, filePath, 100, 0.2, 'test-novel-id');
 
       expect(chunks).toHaveLength(1);
 
@@ -249,8 +249,8 @@ ${paragraph2}`;
       const text1 = 'Content 1';
       const text2 = 'Content 2';
 
-      const chunks1 = strategy.chunk(text1, 'test.md', 100, 0.2);
-      const chunks2 = strategy.chunk(text2, 'test.md', 100, 0.2);
+      const chunks1 = strategy.chunk(text1, 'test.md', 100, 0.2, 'test-novel-id');
+      const chunks2 = strategy.chunk(text2, 'test.md', 100, 0.2, 'test-novel-id');
 
       const hash1 = chunks1[0].id.split('@')[1];
       const hash2 = chunks2[0].id.split('@')[1];
@@ -261,8 +261,8 @@ ${paragraph2}`;
     it('同じ内容で同じハッシュを生成', () => {
       const text = 'Same content';
 
-      const chunks1 = strategy.chunk(text, 'test.md', 100, 0.2);
-      const chunks2 = strategy.chunk(text, 'test.md', 100, 0.2);
+      const chunks1 = strategy.chunk(text, 'test.md', 100, 0.2, 'test-novel-id');
+      const chunks2 = strategy.chunk(text, 'test.md', 100, 0.2, 'test-novel-id');
 
       const hash1 = chunks1[0].id.split('@')[1];
       const hash2 = chunks2[0].id.split('@')[1];
@@ -274,7 +274,7 @@ ${paragraph2}`;
       const text = `Line 1
 Line 2
 Line 3`;
-      const chunks = strategy.chunk(text, 'test.md', 100, 0.2);
+      const chunks = strategy.chunk(text, 'test.md', 100, 0.2, 'test-novel-id');
 
       expect(chunks).toHaveLength(1);
 
@@ -287,14 +287,14 @@ Line 3`;
 
   describe('エッジケース', () => {
     it('空文字列を処理', () => {
-      const chunks = strategy.chunk('', 'test.md', 100, 0.2);
+      const chunks = strategy.chunk('', 'test.md', 100, 0.2, 'test-novel-id');
       expect(chunks).toHaveLength(1);
       expect(chunks[0].content).toBe('');
     });
 
     it('見出しのみを処理', () => {
       const text = '# Title Only';
-      const chunks = strategy.chunk(text, 'test.md', 100, 0.2);
+      const chunks = strategy.chunk(text, 'test.md', 100, 0.2, 'test-novel-id');
 
       expect(chunks).toHaveLength(1);
       expect(chunks[0].title).toBe('Title Only');
@@ -303,7 +303,7 @@ Line 3`;
 
     it('改行のみのテキストを処理', () => {
       const text = '\n\n\n';
-      const chunks = strategy.chunk(text, 'test.md', 100, 0.2);
+      const chunks = strategy.chunk(text, 'test.md', 100, 0.2, 'test-novel-id');
 
       expect(chunks).toHaveLength(1);
       expect(chunks[0].content).toBe(text);
@@ -351,7 +351,7 @@ The book contained secrets of the old world, magic that had been forgotten for c
 And so ends our tale, but the adventure continues...`;
 
     const strategy = new MarkdownChunkingStrategy();
-    const chunks = strategy.chunk(markdownContent, 'novel.md', 200, 0.2);
+    const chunks = strategy.chunk(markdownContent, 'novel.md', 200, 0.2, 'test-novel-id');
 
     // 基本的な期待値をチェック
     expect(chunks.length).toBeGreaterThan(0);

@@ -1,8 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { glob } from 'glob';
-import { FlexBackend } from './backends/FlexBackend.js';
-import { Preset } from 'flexsearch';
+import { KeywordFlexBackend } from './backends/KeywordFlexBackend.js';
+import type { Preset } from 'flexsearch';
 import { Chunk } from './backends/SearchBackend.js';
 import { MarkdownChunkingStrategy } from './lib/chunker.js';
 import { DialogoiConfig } from './lib/config.js';
@@ -12,17 +12,19 @@ import { DialogoiConfig } from './lib/config.js';
  * ファイルシステムの監視、チャンク化、インデックス管理を担当
  */
 export class Indexer {
-  private backend: FlexBackend;
+  private backend: KeywordFlexBackend;
   private chunkingStrategy: MarkdownChunkingStrategy;
   private config: DialogoiConfig;
   private projectRoot: string;
+  private novelId: string;
 
-  constructor(config: DialogoiConfig) {
+  constructor(config: DialogoiConfig, novelId: string) {
     this.config = config;
     this.projectRoot = path.resolve(config.projectRoot);
+    this.novelId = novelId;
 
-    // FlexBackend の初期化
-    this.backend = new FlexBackend({
+    // KeywordFlexBackend の初期化
+    this.backend = new KeywordFlexBackend({
       profile: config.flex.profile as Preset,
     });
 
@@ -82,6 +84,7 @@ export class Indexer {
       relativePath,
       this.config.chunk.maxTokens,
       this.config.chunk.overlap,
+      this.novelId,
     );
 
     // ChunkDataはそのままChunkとして使用可能
@@ -156,8 +159,8 @@ export class Indexer {
   /**
    * 検索機能をバックエンドに委譲
    */
-  async search(query: string, k: number = this.config.search.defaultK) {
-    return this.backend.search(query, k);
+  async search(query: string, k: number = this.config.search.defaultK, novelId: string) {
+    return this.backend.search(query, k, novelId);
   }
 
   /**
