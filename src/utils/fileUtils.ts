@@ -86,3 +86,28 @@ export async function findFilesRecursively(
 export async function ensureDirectory(dirPath: string): Promise<void> {
   await fs.mkdir(dirPath, { recursive: true });
 }
+
+/**
+ * ファイルの指定行範囲を読み込む
+ * @param filePath 読み込むファイルのパス
+ * @param startLine 開始行（1ベース）
+ * @param endLine 終了行（1ベース）
+ * @returns 指定範囲のファイル内容
+ */
+export async function readFileLines(
+  filePath: string,
+  startLine: number,
+  endLine: number,
+): Promise<string> {
+  try {
+    const content = await fs.readFile(filePath, 'utf-8');
+    const lines = content.split('\n');
+
+    const start = Math.max(0, startLine - 1); // 1ベースから0ベースに変換
+    const end = Math.min(lines.length, endLine);
+
+    return lines.slice(start, end).join('\n');
+  } catch (error) {
+    throw new Error(`ファイル読み込みエラー: ${filePath} - ${error}`);
+  }
+}

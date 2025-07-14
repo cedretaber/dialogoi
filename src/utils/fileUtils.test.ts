@@ -7,6 +7,7 @@ import {
   readFileWithPreview,
   findFilesRecursively,
   ensureDirectory,
+  readFileLines,
 } from './fileUtils.js';
 
 describe('fileUtils', () => {
@@ -64,5 +65,38 @@ describe('fileUtils', () => {
     expect(result).toContain(txtPath);
     expect(result).toContain(mdPath);
     expect(result).not.toContain(otherPath);
+  });
+
+  it('readFileLines returns specified line range correctly', async () => {
+    await ensureDirectory(nestedDir);
+    await fs.writeFile(testFilePath, testContent, 'utf-8');
+
+    // Test reading middle lines
+    const result = await readFileLines(testFilePath, 2, 3);
+    expect(result).toBe('Line 2\nLine 3');
+
+    // Test reading single line
+    const singleLine = await readFileLines(testFilePath, 1, 1);
+    expect(singleLine).toBe('Line 1');
+
+    // Test reading all lines
+    const allLines = await readFileLines(testFilePath, 1, 4);
+    expect(allLines).toBe(testContent);
+  });
+
+  it('readFileLines handles edge cases properly', async () => {
+    await ensureDirectory(nestedDir);
+    await fs.writeFile(testFilePath, testContent, 'utf-8');
+
+    // Test reading beyond file end
+    const beyondEnd = await readFileLines(testFilePath, 3, 10);
+    expect(beyondEnd).toBe('Line 3\nLine 4');
+
+    // Test reading from line 0 (should start from 1)
+    const fromZero = await readFileLines(testFilePath, 0, 2);
+    expect(fromZero).toBe('Line 1\nLine 2');
+
+    // Test reading non-existent file
+    await expect(readFileLines(path.join(nestedDir, 'nonexistent.txt'), 1, 1)).rejects.toThrow();
   });
 });

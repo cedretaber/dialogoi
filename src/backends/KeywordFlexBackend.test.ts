@@ -18,6 +18,7 @@ describe('KeywordFlexBackend', () => {
     backend = new KeywordFlexBackend({
       profile: 'fast' as Preset,
       minWordLength: 2,
+      baseDirectory: tempDir,
     });
   });
 
@@ -235,6 +236,7 @@ describe('KeywordFlexBackend', () => {
     const backendWithFilter = new KeywordFlexBackend({
       profile: 'fast' as Preset,
       minWordLength: 3, // 3文字以上のみ
+      baseDirectory: tempDir,
     });
 
     // テストファイル作成

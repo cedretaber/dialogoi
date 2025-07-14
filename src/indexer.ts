@@ -26,6 +26,7 @@ export class Indexer {
     // KeywordFlexBackend の初期化
     this.backend = new KeywordFlexBackend({
       profile: config.flex.profile as Preset,
+      baseDirectory: this.projectRoot,
     });
 
     // チャンク化戦略の初期化

@@ -3,22 +3,45 @@ import path from 'path';
 import { NovelConfig, NovelProject } from '../domain/novel.js';
 import { fileExists, findFilesRecursively, ensureDirectory } from '../utils/fileUtils.js';
 import { IndexerManager } from '../lib/indexerManager.js';
+import { DialogoiConfig } from '../lib/config.js';
 
 export class NovelService {
   private readonly baseDir: string;
   private novelProjects: Map<string, NovelProject> = new Map();
-  private indexerManager?: IndexerManager;
+  private indexerManager: IndexerManager;
 
-  constructor(baseDir?: string) {
+  constructor(baseDir?: string, config?: DialogoiConfig) {
     this.baseDir = baseDir || path.join(process.cwd(), 'novels');
+
+    // IndexerManagerを内部で初期化
+    if (config) {
+      this.indexerManager = new IndexerManager(config);
+    } else {
+      // configが提供されない場合は後で設定
+      this.indexerManager = null as unknown as IndexerManager;
+    }
   }
 
   /**
-   * IndexerManagerを設定（オプション）
+   * IndexerManagerを設定（後方互換性のため）
    * @param indexerManager IndexerManager インスタンス
    */
   setIndexerManager(indexerManager: IndexerManager): void {
     this.indexerManager = indexerManager;
+  }
+
+  /**
+   * RAG検索を実行
+   * @param novelId 小説ID
+   * @param query 検索クエリ
+   * @param k 取得する結果数
+   * @returns 検索結果
+   */
+  async searchRag(novelId: string, query: string, k: number) {
+    if (!this.indexerManager) {
+      throw new Error('IndexerManager が設定されていません');
+    }
+    return this.indexerManager.search(novelId, query, k);
   }
 
   // 小説プロジェクトを発見・読み込み

@@ -2,6 +2,7 @@ import { Document, DocumentData } from 'flexsearch';
 import type { Preset } from 'flexsearch';
 import { SearchBackend, SearchResult, Chunk } from './SearchBackend.js';
 import { MorphAnalyzer, createMorphAnalyzer } from '../lib/morphAnalyzer.js';
+import { readFileLines } from '../utils/fileUtils.js';
 
 /**
  * FlexSearchキーワード設定オプション
@@ -9,6 +10,7 @@ import { MorphAnalyzer, createMorphAnalyzer } from '../lib/morphAnalyzer.js';
 interface KeywordFlexSearchConfig {
   profile: Preset;
   minWordLength?: number; // インデックス対象の最小文字数（デフォルト: 2）
+  baseDirectory: string; // ベースディレクトリ（相対パスを絶対パスに変換するため）
 }
 
 /**
@@ -61,6 +63,7 @@ export class KeywordFlexBackend extends SearchBackend {
   private config: KeywordFlexSearchConfig;
   private isInitialized = false;
   private nextId = 1;
+  private baseDirectory: string;
   // チャンク内容はキャッシュせず、必要時にファイルから読み込む
 
   constructor(config: KeywordFlexSearchConfig) {
@@ -69,6 +72,7 @@ export class KeywordFlexBackend extends SearchBackend {
       minWordLength: 2,
       ...config,
     };
+    this.baseDirectory = config.baseDirectory;
     this.morphAnalyzer = createMorphAnalyzer();
   }
 
@@ -116,15 +120,12 @@ export class KeywordFlexBackend extends SearchBackend {
     endLine: number,
   ): Promise<string> {
     try {
-      const content = await import('fs/promises').then((fs) => fs.readFile(filePath, 'utf-8'));
-      const lines = content.split('\n');
-
-      const start = Math.max(0, startLine - 1); // 1ベースから0ベースに変換
-      const end = Math.min(lines.length, endLine);
-
-      return lines.slice(start, end).join('\n');
+      // 相対パスを絶対パスに変換
+      const path = await import('path');
+      const absolutePath = path.resolve(this.baseDirectory, filePath);
+      return await readFileLines(absolutePath, startLine, endLine);
     } catch (error) {
-      console.error(`ファイル読み込みエラー: ${filePath}`, error);
+      console.error(`ファイル読み込みエラー: ${filePath} (${this.baseDirectory})`, error);
       return '';
     }
   }
@@ -213,7 +214,7 @@ export class KeywordFlexBackend extends SearchBackend {
         }
 
         for (const target of searchTargets) {
-          const results = await this.wordIndex.search(target, {
+          const results = this.wordIndex.search(target, {
             limit: 50,
             enrich: true,
             tag: { novelId },
@@ -273,7 +274,7 @@ export class KeywordFlexBackend extends SearchBackend {
       throw new Error('Word index not initialized');
     }
 
-    const results = await this.wordIndex.search(query, {
+    const results = this.wordIndex.search(query, {
       limit: k * 2,
       enrich: true,
       tag: { novelId },
@@ -427,7 +428,7 @@ export class KeywordFlexBackend extends SearchBackend {
     }
 
     // ファイルパスタグで検索して削除
-    const searchResults = await this.wordIndex.search({
+    const searchResults = this.wordIndex.search({
       tag: { filePath },
       enrich: false,
     });
