@@ -38,7 +38,7 @@ export class Indexer {
    * ファイルをスキャンしてインデックスを構築
    */
   async initialize(): Promise<void> {
-    console.log('📝 インデックスを構築します');
+    console.error('📝 インデックスを構築します');
     await this.buildFullIndex();
   }
 
@@ -47,11 +47,11 @@ export class Indexer {
    */
   async buildFullIndex(): Promise<void> {
     const startTime = Date.now();
-    console.log('🔍 プロジェクトファイルを走査中...');
+    console.error('🔍 プロジェクトファイルを走査中...');
 
     // ターゲットファイルを検索（*.md, *.txt）
     const files = await this.findTargetFiles();
-    console.log(`📄 ${files.length} 個のファイルを発見`);
+    console.error(`📄 ${files.length} 個のファイルを発見`);
 
     let totalChunks = 0;
 
@@ -60,7 +60,9 @@ export class Indexer {
       try {
         const chunks = await this.processFile(filePath);
         totalChunks += chunks.length;
-        console.log(`  ✓ ${path.relative(this.projectRoot, filePath)}: ${chunks.length} チャンク`);
+        console.error(
+          `  ✓ ${path.relative(this.projectRoot, filePath)}: ${chunks.length} チャンク`,
+        );
       } catch (error) {
         console.error(`  ✗ ${path.relative(this.projectRoot, filePath)}: ${error}`);
       }
@@ -69,7 +71,7 @@ export class Indexer {
     // インデックスはメモリ内に保持（エクスポート不要）
 
     const duration = Date.now() - startTime;
-    console.log(`🎉 インデックス構築完了: ${totalChunks} チャンク, ${duration}ms`);
+    console.error(`🎉 インデックス構築完了: ${totalChunks} チャンク, ${duration}ms`);
   }
 
   /**
@@ -131,7 +133,7 @@ export class Indexer {
       // 新しいチャンクを追加
       await this.processFile(filePath);
 
-      console.log(`🔄 ファイルを更新しました: ${path.relative(this.projectRoot, filePath)}`);
+      console.error(`🔄 ファイルを更新しました: ${path.relative(this.projectRoot, filePath)}`);
     } catch (error) {
       console.error(`❌ ファイル更新エラー: ${filePath}`, error);
     }
@@ -143,7 +145,7 @@ export class Indexer {
   async removeFile(filePath: string): Promise<void> {
     try {
       await this.removeFileChunks(filePath);
-      console.log(`🗑️ ファイルを削除しました: ${path.relative(this.projectRoot, filePath)}`);
+      console.error(`🗑️ ファイルを削除しました: ${path.relative(this.projectRoot, filePath)}`);
     } catch (error) {
       console.error(`❌ ファイル削除エラー: ${filePath}`, error);
     }

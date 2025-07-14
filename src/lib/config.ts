@@ -146,10 +146,10 @@ export function loadConfig(configPath?: string): DialogoiConfig {
   try {
     const configContent = fs.readFileSync(targetPath, 'utf-8');
     fileConfig = JSON.parse(configContent) as Partial<DialogoiConfig>;
-    console.log(`✅ 設定ファイルをロードしました: ${targetPath}`);
+    console.error(`✅ 設定ファイルをロードしました: ${targetPath}`);
   } catch (error) {
     console.warn(`⚠️  設定ファイルが見つかりません: ${targetPath}`);
-    console.log('📝 デフォルト設定を使用します');
+    console.error('📝 デフォルト設定を使用します');
   }
 
   // コマンドライン引数の上書きを取得
@@ -160,7 +160,7 @@ export function loadConfig(configPath?: string): DialogoiConfig {
 
   // CLI引数があれば通知
   if (Object.keys(cliOverrides).length > 0) {
-    console.log('📋 コマンドライン引数で設定を上書きしました:', cliOverrides);
+    console.error('📋 コマンドライン引数で設定を上書きしました:', cliOverrides);
   }
 
   return _config;
