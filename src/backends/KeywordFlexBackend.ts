@@ -434,13 +434,16 @@ export class KeywordFlexBackend extends SearchBackend {
     });
 
     if (Array.isArray(searchResults)) {
+      let removedCount = 0;
       for (const result of searchResults) {
         if (Array.isArray(result.result)) {
           for (const id of result.result) {
             this.wordIndex.remove(id);
+            removedCount++;
           }
         }
       }
+      console.error(`🗑️ ファイル削除: ${filePath} (${removedCount}個のチャンク)`);
     }
   }
 
@@ -460,13 +463,16 @@ export class KeywordFlexBackend extends SearchBackend {
     });
 
     if (Array.isArray(searchResults)) {
+      let removedCount = 0;
       for (const result of searchResults) {
         if (Array.isArray(result.result)) {
           for (const id of result.result) {
             this.wordIndex.remove(id);
+            removedCount++;
           }
         }
       }
+      console.error(`🗑️ 小説削除: ${novelId} (${removedCount}個のチャンク)`);
     }
   }
 
