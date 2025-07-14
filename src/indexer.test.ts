@@ -45,7 +45,7 @@ describe('Indexer', () => {
       // buildFullIndexの処理に必要なモック
       vi.mocked(glob).mockResolvedValue([]);
 
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.initialize();
 
       expect(consoleSpy).toHaveBeenCalledWith('📝 インデックスを構築します');
@@ -55,7 +55,7 @@ describe('Indexer', () => {
       // buildFullIndexの処理に必要なモック
       vi.mocked(glob).mockResolvedValue([]);
 
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.initialize();
 
       expect(consoleSpy).toHaveBeenCalledWith('📝 インデックスを構築します');
@@ -95,7 +95,7 @@ describe('Indexer', () => {
       // ディレクトリ作成のモック
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.buildFullIndex();
 
       expect(consoleSpy).toHaveBeenCalledWith('🔍 プロジェクトファイルを走査中...');
@@ -143,7 +143,7 @@ describe('Indexer', () => {
 
       vi.mocked(fs.readFile).mockResolvedValueOnce(testContent);
 
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.updateFile(testFilePath);
 
       expect(consoleSpy).toHaveBeenCalledWith('🔄 ファイルを更新しました: update.md');
@@ -168,7 +168,7 @@ describe('Indexer', () => {
     it('ファイルの削除を処理する', async () => {
       const testFilePath = '/test/project/remove.md';
 
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.removeFile(testFilePath);
 
       expect(consoleSpy).toHaveBeenCalledWith('🗑️ ファイルを削除しました: remove.md');
@@ -179,7 +179,7 @@ describe('Indexer', () => {
 
       // 現在の実装ではremoveFileChunksは空の処理なのでエラーは発生しない
       // このテストはTODO実装後に有効になる
-      const consoleSpy = vi.spyOn(console, 'log');
+      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.removeFile(testFilePath);
 
       expect(consoleSpy).toHaveBeenCalledWith('🗑️ ファイルを削除しました: error.md');

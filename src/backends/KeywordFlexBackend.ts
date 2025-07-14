@@ -176,6 +176,9 @@ export class KeywordFlexBackend extends SearchBackend {
    * キーワード検索を実行
    */
   async search(query: string, k: number, novelId: string): Promise<SearchResult[]> {
+    // インデックスが初期化されていない場合は初期化
+    await this.initializeIndex();
+
     if (!this.isInitialized || !this.wordIndex) {
       throw new Error('Word index not initialized');
     }
