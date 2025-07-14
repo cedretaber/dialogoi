@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import * as fs from 'fs/promises';
+import type { Stats } from 'fs';
 import { Indexer } from './indexer.js';
 import { DialogoiConfig } from './lib/config.js';
-import { glob } from 'glob';
+import { findFilesRecursively } from './utils/fileUtils.js';
 
 // モックの設定
 vi.mock('fs/promises');
-vi.mock('glob');
+vi.mock('./utils/fileUtils.js');
 vi.mock('./backends/KeywordFlexBackend.js');
 
 describe('Indexer', () => {
@@ -48,17 +49,11 @@ describe('Indexer', () => {
         '/test/project/test-novel/nested/file3.md',
       ];
 
-      // globモックの設定
-      vi.mocked(glob).mockImplementation(async (pattern: string | string[]) => {
-        if (typeof pattern === 'string') {
-          if (pattern.endsWith('*.md')) {
-            return [mockFiles[0], mockFiles[2]];
-          } else if (pattern.endsWith('*.txt')) {
-            return [mockFiles[1]];
-          }
-        }
-        return [];
-      });
+      // fs.statモック（ディレクトリが存在することを示す）
+      vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as Stats);
+
+      // findFilesRecursivelyモックの設定
+      vi.mocked(findFilesRecursively).mockResolvedValue(mockFiles);
 
       // ファイル読み込みのモック
       vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
@@ -87,7 +82,10 @@ describe('Indexer', () => {
     it('ファイル処理中のエラーを適切にハンドリングする', async () => {
       const mockFiles = ['/test/project/test-novel/error.md'];
 
-      vi.mocked(glob).mockResolvedValue(mockFiles);
+      // fs.statモック（ディレクトリが存在することを示す）
+      vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as Stats);
+
+      vi.mocked(findFilesRecursively).mockResolvedValue(mockFiles);
       vi.mocked(fs.readFile).mockRejectedValueOnce(new Error('Read error'));
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
@@ -222,11 +220,10 @@ describe('Indexer', () => {
         '/test/project/.hidden/secret.md',
       ];
 
-      vi.mocked(glob).mockImplementation(async () => {
-        // globの実装でignoreオプションが正しく動作することを想定
-        // 隠しディレクトリを除外したファイルのみ返す
-        return [mockFiles[0]];
-      });
+      // fs.statモック（ディレクトリが存在することを示す）
+      vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as Stats);
+
+      vi.mocked(findFilesRecursively).mockResolvedValue([mockFiles[0]]);
 
       const files = await (
         indexer as unknown as { findTargetFiles: (novelId: string) => Promise<string[]> }
@@ -235,13 +232,14 @@ describe('Indexer', () => {
       expect(files).toEqual(['/test/project/file.md']);
     });
 
-    it('重複ファイルを除去してソートする', async () => {
-      vi.mocked(glob).mockImplementation(async (pattern: string | string[]) => {
-        if (typeof pattern === 'string' && pattern.endsWith('*.md')) {
-          return ['/test/project/b.md', '/test/project/a.md', '/test/project/b.md'];
-        }
-        return [];
-      });
+    it('見つかったファイルをソートする', async () => {
+      // fs.statモック（ディレクトリが存在することを示す）
+      vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as Stats);
+
+      vi.mocked(findFilesRecursively).mockResolvedValue([
+        '/test/project/b.md',
+        '/test/project/a.md',
+      ]);
 
       const files = await (
         indexer as unknown as { findTargetFiles: (novelId: string) => Promise<string[]> }

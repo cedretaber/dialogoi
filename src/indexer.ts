@@ -1,11 +1,11 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { glob } from 'glob';
 import { KeywordFlexBackend } from './backends/KeywordFlexBackend.js';
 import type { Preset } from 'flexsearch';
 import { Chunk } from './backends/SearchBackend.js';
 import { MarkdownChunkingStrategy } from './lib/chunker.js';
 import { DialogoiConfig } from './lib/config.js';
+import { findFilesRecursively } from './utils/fileUtils.js';
 
 /**
  * インデックス管理クラス
@@ -93,18 +93,25 @@ export class Indexer {
    */
   private async findTargetFiles(novelId: string): Promise<string[]> {
     const novelPath = path.join(this.projectRoot, novelId);
-    const patterns = [path.join(novelPath, '**/*.md'), path.join(novelPath, '**/*.txt')];
+    console.error(`🔍 検索対象パス: ${novelPath}`);
 
-    const files: string[] = [];
-    for (const pattern of patterns) {
-      const matches = await glob(pattern, {
-        ignore: ['**/.*/**'],
-      });
-      files.push(...matches);
+    // プロジェクトディレクトリが存在するかチェック
+    try {
+      const stat = await fs.stat(novelPath);
+      if (!stat.isDirectory()) {
+        console.error(`❌ プロジェクトディレクトリが見つかりません: ${novelPath}`);
+        return [];
+      }
+    } catch (error) {
+      console.error(`❌ プロジェクトディレクトリにアクセスできません: ${novelPath}`, error);
+      return [];
     }
 
-    // 重複除去とソート
-    return [...new Set(files)].sort();
+    // findFilesRecursivelyを使用してファイルを検索
+    const files = await findFilesRecursively(novelPath, ['md', 'txt']);
+    console.error(`📄 合計 ${files.length} 個のファイルを発見: ${files.join(', ')}`);
+
+    return files.sort();
   }
 
   /**
