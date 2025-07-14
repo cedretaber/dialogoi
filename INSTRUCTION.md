@@ -199,9 +199,8 @@ MCPツール → NovelService.searchRag() → IndexerManager → KeywordFlexBack
 
 ### 実装予定項目 📋
 
-- [ ] **watcher.ts** ― chokidarを使ったファイル監視
-- [ ] **ホットリロード** ― ファイル変更の自動反映
-- [ ] **インデックス永続化** ― 起動時間の短縮
+- [x] **fileWatcher.ts** ― chokidarを使ったファイル監視
+- [x] **ホットリロード** ― ファイル変更の自動反映
 
 ### 現在の進捗状況 (2025-01-14)
 
@@ -210,7 +209,8 @@ MCPツール → NovelService.searchRag() → IndexerManager → KeywordFlexBack
 1. **形態素解析ベース検索** - kuromojinで日本語を解析し、表層形・基本形・読みで検索
 2. **MCPサーバー統合** - NovelServiceがMCPツールを提供、既存APIと完全互換
 3. **遅延インデックス** - 初回検索時にインデックス構築、メモリ効率的
-4. **抽象化設計** - SearchBackendインターフェースで将来のベクトル検索に対応
+4. **リアルタイム監視** - chokidarによるファイル変更の自動検知・インデックス更新
+5. **抽象化設計** - SearchBackendインターフェースで将来のベクトル検索に対応
 
 **技術的な実装詳細:**
 
@@ -218,6 +218,8 @@ MCPツール → NovelService.searchRag() → IndexerManager → KeywordFlexBack
 - **スニペット生成** - マッチ位置から前後の文脈を抽出（最大240文字）
 - **スコアリング** - 品詞による重み付け（名詞1.0、動詞0.8、形容詞0.7）
 - **並列チャンク処理** - Promise.allで効率的なインデックス構築
+- **ファイル監視** - 500msデバウンス、隠しファイル除外、自動インデックス更新
+- **正規表現検索** - 単純検索と正規表現検索の両対応、エラーハンドリング付き
 - **型安全性** - any型を排除、TypeScript strictモード準拠
 
 ---

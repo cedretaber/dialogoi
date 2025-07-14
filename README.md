@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/cedretaber/dialogoi/actions/workflows/ci.yml/badge.svg)](https://github.com/cedretaber/dialogoi/actions/workflows/ci.yml)
 
-小説執筆を支援するRAG搭載MCP（Model Context Protocol）サーバです。FlexSearchによる高速な日本語全文検索機能を提供し、小説の設定や本文を横断的に検索できます。
+小説執筆を支援するRAG搭載MCP（Model Context Protocol）サーバです。FlexSearchによる高速な日本語全文検索機能を提供し、小説の設定や本文を横断的に検索できます。ファイル監視機能により、ファイル変更時のインデックス自動更新に対応しています。
 
 ## インストール
 
@@ -239,6 +239,14 @@ novels/
 - **ファイルサイズ制限**: 最大10MB
 - **ディレクトリ制限**: プロジェクト設定で許可されたディレクトリのみ
 - **上書き保護**: 既存ファイルの誤上書きを防止（明示的な許可が必要）
+
+## 機能の特徴
+
+- **リアルタイム監視**: ファイル変更時の自動インデックス更新
+- **正規表現検索**: 高度な検索パターンに対応
+- **日本語最適化**: 形態素解析による高精度検索
+- **MCPプロトコル**: Claude Desktopと完全統合
+- **セキュア**: ファイル作成時の包括的なセキュリティチェック
 
 ## 使用例
 

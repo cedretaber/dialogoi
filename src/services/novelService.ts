@@ -44,6 +44,36 @@ export class NovelService {
     return this.indexerManager.search(novelId, query, k);
   }
 
+  /**
+   * ファイル監視を開始
+   */
+  async startFileWatching(): Promise<void> {
+    if (!this.indexerManager) {
+      throw new Error('IndexerManager が設定されていません');
+    }
+    await this.indexerManager.startFileWatching();
+  }
+
+  /**
+   * ファイル監視を停止
+   */
+  async stopFileWatching(): Promise<void> {
+    if (!this.indexerManager) {
+      throw new Error('IndexerManager が設定されていません');
+    }
+    await this.indexerManager.stopFileWatching();
+  }
+
+  /**
+   * ファイル監視の状態を取得
+   */
+  isFileWatching(): boolean {
+    if (!this.indexerManager) {
+      return false;
+    }
+    return this.indexerManager.isFileWatching();
+  }
+
   // 小説プロジェクトを発見・読み込み
   async discoverNovelProjects(): Promise<void> {
     try {

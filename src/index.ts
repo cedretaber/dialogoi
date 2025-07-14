@@ -27,6 +27,16 @@ console.error(
 // NovelServiceを初期化（内部でIndexerManagerも初期化）
 const novelService = new NovelService(baseDir, dialogoiConfig);
 
+// ファイル監視を開始
+(async () => {
+  try {
+    await novelService.startFileWatching();
+    console.error('🚀 ファイル監視が開始されました');
+  } catch (error) {
+    console.error('❌ ファイル監視の開始に失敗しました:', error);
+  }
+})();
+
 const server = new McpServer({
   name: 'Dialogoi',
   version: '1.0.0',
@@ -511,6 +521,30 @@ async function main() {
   console.error('🔍 NovelServiceを初期化しました（小説プロジェクト別のIndexerは遅延作成）');
 
   const transport = new StdioServerTransport();
+
+  // Graceful shutdown処理
+  process.on('SIGINT', async () => {
+    console.error('🛑 MCPサーバーを停止します...');
+    try {
+      await novelService.stopFileWatching();
+      console.error('✅ ファイル監視を停止しました');
+    } catch (error) {
+      console.error('❌ ファイル監視の停止に失敗しました:', error);
+    }
+    process.exit(0);
+  });
+
+  process.on('SIGTERM', async () => {
+    console.error('🛑 MCPサーバーを停止します...');
+    try {
+      await novelService.stopFileWatching();
+      console.error('✅ ファイル監視を停止しました');
+    } catch (error) {
+      console.error('❌ ファイル監視の停止に失敗しました:', error);
+    }
+    process.exit(0);
+  });
+
   await server.connect(transport);
   console.error('Dialogoi MCP Server started');
 }
