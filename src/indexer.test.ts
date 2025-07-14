@@ -33,42 +33,19 @@ describe('Indexer', () => {
       },
     };
 
-    indexer = new Indexer(mockConfig, 'test-novel-id');
+    indexer = new Indexer(mockConfig);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  describe('initialize', () => {
-    it('インデックスを初期化してフルビルドを実行する', async () => {
-      // buildFullIndexの処理に必要なモック
-      vi.mocked(glob).mockResolvedValue([]);
-
-      const consoleSpy = vi.spyOn(console, 'error');
-      await indexer.initialize();
-
-      expect(consoleSpy).toHaveBeenCalledWith('📝 インデックスを構築します');
-    });
-
-    it('ファイルが見つからない場合も正常に動作する', async () => {
-      // buildFullIndexの処理に必要なモック
-      vi.mocked(glob).mockResolvedValue([]);
-
-      const consoleSpy = vi.spyOn(console, 'error');
-      await indexer.initialize();
-
-      expect(consoleSpy).toHaveBeenCalledWith('📝 インデックスを構築します');
-      expect(consoleSpy).toHaveBeenCalledWith('📄 0 個のファイルを発見');
-    });
-  });
-
-  describe('buildFullIndex', () => {
-    it('プロジェクト内のファイルを走査してインデックスを構築する', async () => {
+  describe('indexNovel', () => {
+    it('特定の小説プロジェクトのファイルを走査してインデックスを構築する', async () => {
       const mockFiles = [
-        '/test/project/file1.md',
-        '/test/project/file2.txt',
-        '/test/project/nested/file3.md',
+        '/test/project/test-novel/file1.md',
+        '/test/project/test-novel/file2.txt',
+        '/test/project/test-novel/nested/file3.md',
       ];
 
       // globモックの設定
@@ -96,24 +73,30 @@ describe('Indexer', () => {
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
       const consoleSpy = vi.spyOn(console, 'error');
-      await indexer.buildFullIndex();
+      await indexer.indexNovel('test-novel');
 
-      expect(consoleSpy).toHaveBeenCalledWith('🔍 プロジェクトファイルを走査中...');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        '🔍 小説プロジェクト "test-novel" のファイルを走査中...',
+      );
       expect(consoleSpy).toHaveBeenCalledWith('📄 3 個のファイルを発見');
-      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('🎉 インデックス構築完了'));
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('🎉 小説プロジェクト "test-novel" のインデックス構築完了'),
+      );
     });
 
     it('ファイル処理中のエラーを適切にハンドリングする', async () => {
-      const mockFiles = ['/test/project/error.md'];
+      const mockFiles = ['/test/project/test-novel/error.md'];
 
       vi.mocked(glob).mockResolvedValue(mockFiles);
       vi.mocked(fs.readFile).mockRejectedValueOnce(new Error('Read error'));
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
       const consoleErrorSpy = vi.spyOn(console, 'error');
-      await indexer.buildFullIndex();
+      await indexer.indexNovel('test-novel');
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(expect.stringContaining('✗ error.md: Error:'));
+      expect(consoleErrorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('✗ test-novel/error.md: Error:'),
+      );
     });
   });
 
@@ -124,7 +107,7 @@ describe('Indexer', () => {
 
       vi.mocked(fs.readFile).mockResolvedValueOnce(testContent);
 
-      const chunks = await indexer.processFile(testFilePath);
+      const chunks = await indexer.processFile(testFilePath, 'test-novel');
 
       expect(chunks).toBeDefined();
       expect(chunks.length).toBeGreaterThan(0);
@@ -134,8 +117,6 @@ describe('Indexer', () => {
     });
   });
 
-  // import/exportメソッドは削除されました
-
   describe('updateFile', () => {
     it('ファイルの更新を処理する', async () => {
       const testFilePath = '/test/project/update.md';
@@ -144,7 +125,7 @@ describe('Indexer', () => {
       vi.mocked(fs.readFile).mockResolvedValueOnce(testContent);
 
       const consoleSpy = vi.spyOn(console, 'error');
-      await indexer.updateFile(testFilePath);
+      await indexer.updateFile(testFilePath, 'test-novel');
 
       expect(consoleSpy).toHaveBeenCalledWith('🔄 ファイルを更新しました: update.md');
     });
@@ -155,7 +136,7 @@ describe('Indexer', () => {
       vi.mocked(fs.readFile).mockRejectedValueOnce(new Error('Read error'));
 
       const consoleErrorSpy = vi.spyOn(console, 'error');
-      await indexer.updateFile(testFilePath);
+      await indexer.updateFile(testFilePath, 'test-novel');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
         `❌ ファイル更新エラー: ${testFilePath}`,
@@ -177,8 +158,6 @@ describe('Indexer', () => {
     it('ファイル削除時のエラーを適切にハンドリングする', async () => {
       const testFilePath = '/test/project/error.md';
 
-      // 現在の実装ではremoveFileChunksは空の処理なのでエラーは発生しない
-      // このテストはTODO実装後に有効になる
       const consoleSpy = vi.spyOn(console, 'error');
       await indexer.removeFile(testFilePath);
 
@@ -250,8 +229,8 @@ describe('Indexer', () => {
       });
 
       const files = await (
-        indexer as unknown as { findTargetFiles: () => Promise<string[]> }
-      ).findTargetFiles();
+        indexer as unknown as { findTargetFiles: (novelId: string) => Promise<string[]> }
+      ).findTargetFiles('test-novel');
 
       expect(files).toEqual(['/test/project/file.md']);
     });
@@ -265,8 +244,8 @@ describe('Indexer', () => {
       });
 
       const files = await (
-        indexer as unknown as { findTargetFiles: () => Promise<string[]> }
-      ).findTargetFiles();
+        indexer as unknown as { findTargetFiles: (novelId: string) => Promise<string[]> }
+      ).findTargetFiles('test-novel');
 
       expect(files).toEqual(['/test/project/a.md', '/test/project/b.md']);
     });

@@ -106,8 +106,6 @@ export class SequentialSplitStrategy implements TextSplitStrategy {
   }
 }
 
-// ChunkDataインターフェースは削除し、Chunkクラスを使用
-
 /**
  * チャンク化戦略の抽象インターフェース
  */
@@ -450,8 +448,6 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
 
     return paragraphs;
   }
-
-  // generateChunkIdとgenerateContentHashメソッドは削除（Chunkクラスのメソッドで置き換え）
 }
 
 /**

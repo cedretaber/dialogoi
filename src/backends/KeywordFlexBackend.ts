@@ -64,7 +64,6 @@ export class KeywordFlexBackend extends SearchBackend {
   private isInitialized = false;
   private nextId = 1;
   private baseDirectory: string;
-  // チャンク内容はキャッシュせず、必要時にファイルから読み込む
 
   constructor(config: KeywordFlexSearchConfig) {
     super();
@@ -409,7 +408,6 @@ export class KeywordFlexBackend extends SearchBackend {
 
     // ファイル単位で処理
     for (const [filePath, fileChunks] of groupedByFile) {
-      // 既存のファイルの単語を一回だけ削除
       await this.removeByFile(filePath);
 
       // 新しい単語をまとめて追加
@@ -430,7 +428,6 @@ export class KeywordFlexBackend extends SearchBackend {
       throw new Error('Word index not initialized');
     }
 
-    // ファイルパスタグで検索して削除
     const searchResults = this.wordIndex.search({
       tag: { filePath },
       enrich: false,
@@ -445,8 +442,32 @@ export class KeywordFlexBackend extends SearchBackend {
         }
       }
     }
+  }
 
-    // キャッシュを使用しないため、追加のクリーンアップ不要
+  /**
+   * 指定小説プロジェクトに関連する単語をすべて削除
+   */
+  async removeByNovel(novelId: string): Promise<void> {
+    await this.initializeIndex();
+
+    if (!this.wordIndex) {
+      throw new Error('Word index not initialized');
+    }
+
+    const searchResults = this.wordIndex.search({
+      tag: { novelId },
+      enrich: false,
+    });
+
+    if (Array.isArray(searchResults)) {
+      for (const result of searchResults) {
+        if (Array.isArray(result.result)) {
+          for (const id of result.result) {
+            this.wordIndex.remove(id);
+          }
+        }
+      }
+    }
   }
 
   /**
@@ -454,6 +475,7 @@ export class KeywordFlexBackend extends SearchBackend {
    */
   async clear(): Promise<void> {
     this.isInitialized = false;
+    this.wordIndex = null;
     await this.initializeIndex();
   }
 

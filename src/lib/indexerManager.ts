@@ -3,51 +3,49 @@ import { DialogoiConfig } from './config.js';
 import { SearchResult } from '../backends/SearchBackend.js';
 
 /**
- * 複数の小説プロジェクトのIndexerを管理するクラス
+ * 単一のIndexerで複数の小説プロジェクトを管理するクラス
  */
 export class IndexerManager {
-  private indexers: Map<string, Indexer> = new Map();
+  private indexer: Indexer;
+  private initializedNovels: Set<string> = new Set();
   private config: DialogoiConfig;
 
   constructor(config: DialogoiConfig) {
     this.config = config;
+    // 単一のIndexerを作成
+    this.indexer = new Indexer(this.config);
   }
 
   /**
-   * 指定された小説IDのIndexerを取得または作成
+   * 指定された小説IDの初期化確認・実行
    * @param novelId 小説ID
-   * @returns Indexer インスタンス
    */
-  async getOrCreateIndexer(novelId: string): Promise<Indexer> {
-    if (!this.indexers.has(novelId)) {
-      console.error(`📚 新しい小説プロジェクトのIndexerを作成: ${novelId}`);
-      const indexer = new Indexer(this.config, novelId);
-      await indexer.initialize();
-      this.indexers.set(novelId, indexer);
+  private async ensureNovelInitialized(novelId: string): Promise<void> {
+    if (!this.initializedNovels.has(novelId)) {
+      console.error(`📚 小説プロジェクトのインデックスを構築: ${novelId}`);
+      await this.indexer.indexNovel(novelId);
+      this.initializedNovels.add(novelId);
     }
-
-    return this.indexers.get(novelId)!;
   }
 
   /**
-   * 指定された小説IDのIndexerが存在するかチェック
+   * 指定された小説IDが初期化済みかチェック
    * @param novelId 小説ID
-   * @returns 存在する場合はtrue
+   * @returns 初期化済みの場合はtrue
    */
-  hasIndexer(novelId: string): boolean {
-    return this.indexers.has(novelId);
+  hasInitialized(novelId: string): boolean {
+    return this.initializedNovels.has(novelId);
   }
 
   /**
-   * 指定された小説IDのIndexerを削除
+   * 指定された小説IDの初期化状態をクリア
    * @param novelId 小説ID
    */
-  async removeIndexer(novelId: string): Promise<void> {
-    const indexer = this.indexers.get(novelId);
-    if (indexer) {
-      await indexer.cleanup();
-      this.indexers.delete(novelId);
-      console.error(`🗑️ 小説プロジェクトのIndexerを削除: ${novelId}`);
+  async clearNovelIndex(novelId: string): Promise<void> {
+    if (this.initializedNovels.has(novelId)) {
+      await this.indexer.removeNovelFromIndex(novelId);
+      this.initializedNovels.delete(novelId);
+      console.error(`🗑️ 小説プロジェクトのインデックスを削除: ${novelId}`);
     }
   }
 
@@ -59,8 +57,8 @@ export class IndexerManager {
    * @returns 検索結果
    */
   async search(novelId: string, query: string, k: number): Promise<SearchResult[]> {
-    const indexer = await this.getOrCreateIndexer(novelId);
-    return indexer.search(query, k, novelId);
+    await this.ensureNovelInitialized(novelId);
+    return this.indexer.search(query, k, novelId);
   }
 
   /**
@@ -69,8 +67,8 @@ export class IndexerManager {
    * @param filePath ファイルパス
    */
   async updateFile(novelId: string, filePath: string): Promise<void> {
-    const indexer = await this.getOrCreateIndexer(novelId);
-    await indexer.updateFile(filePath);
+    await this.ensureNovelInitialized(novelId);
+    await this.indexer.updateFile(filePath, novelId);
   }
 
   /**
@@ -79,8 +77,8 @@ export class IndexerManager {
    * @param filePath ファイルパス
    */
   async removeFile(novelId: string, filePath: string): Promise<void> {
-    const indexer = await this.getOrCreateIndexer(novelId);
-    await indexer.removeFile(filePath);
+    await this.ensureNovelInitialized(novelId);
+    await this.indexer.removeFile(filePath);
   }
 
   /**
@@ -88,47 +86,46 @@ export class IndexerManager {
    * @param novelId 小説ID
    */
   async rebuildIndex(novelId: string): Promise<void> {
-    const indexer = await this.getOrCreateIndexer(novelId);
-    await indexer.buildFullIndex();
+    await this.clearNovelIndex(novelId);
+    await this.ensureNovelInitialized(novelId);
   }
 
   /**
-   * 全てのIndexerをクリーンアップ
+   * 全てのインデックスをクリーンアップ
    */
   async cleanup(): Promise<void> {
-    const cleanupPromises = Array.from(this.indexers.values()).map((indexer) => indexer.cleanup());
-    await Promise.all(cleanupPromises);
-    this.indexers.clear();
-    console.error('🧹 全てのIndexerをクリーンアップしました');
+    await this.indexer.cleanup();
+    this.initializedNovels.clear();
+    console.error('🧹 全てのインデックスをクリーンアップしました');
   }
 
   /**
-   * 管理中のIndexer一覧を取得
+   * 初期化済み小説一覧を取得
    * @returns 小説IDのリスト
    */
-  getIndexerList(): string[] {
-    return Array.from(this.indexers.keys());
+  getInitializedNovels(): string[] {
+    return Array.from(this.initializedNovels);
   }
 
   /**
    * 統計情報を取得
-   * @returns 管理中のIndexer数と詳細情報
+   * @returns 初期化済み小説数と詳細情報
    */
   getStats(): {
-    totalIndexers: number;
-    indexers: Array<{
+    totalInitializedNovels: number;
+    novels: Array<{
       novelId: string;
-      isReady: boolean;
+      isInitialized: boolean;
     }>;
   } {
-    const indexers = Array.from(this.indexers.entries()).map(([novelId, indexer]) => ({
+    const novels = Array.from(this.initializedNovels).map((novelId) => ({
       novelId,
-      isReady: indexer.isReady(),
+      isInitialized: true,
     }));
 
     return {
-      totalIndexers: this.indexers.size,
-      indexers,
+      totalInitializedNovels: this.initializedNovels.size,
+      novels,
     };
   }
 }

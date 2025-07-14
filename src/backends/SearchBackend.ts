@@ -55,8 +55,6 @@ export class Chunk {
 
 /**
  * 検索バックエンドの抽象インターフェース
- * フェーズ1: FlexSearchを使用
- * フェーズ2: Qdrantハイブリッド検索を追加
  */
 export abstract class SearchBackend {
   /**
@@ -76,13 +74,17 @@ export abstract class SearchBackend {
     unchanged: number;
   }>;
 
-  // removeメソッドは削除（removeByFileで置き換え）
-
   /**
    * 指定ファイルに関連するチャンクをすべて削除
    * @param filePath 削除対象のファイルパス
    */
   abstract removeByFile(filePath: string): Promise<void>;
+
+  /**
+   * 指定小説プロジェクトに関連するチャンクをすべて削除
+   * @param novelId 削除対象の小説プロジェクトID
+   */
+  abstract removeByNovel(novelId: string): Promise<void>;
 
   /**
    * 検索を実行

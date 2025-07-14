@@ -163,14 +163,11 @@ describe('KeywordFlexBackend', () => {
 
     await backend.add(chunks);
 
-    // 削除前は両方見つかる
     let results = await backend.search('ファイル', 5, 'test-novel-1');
     expect(results.length).toBe(2);
 
-    // remove.mdを削除
     await backend.removeByFile(removeFile);
 
-    // 削除後はkeep.mdのみ見つかる
     results = await backend.search('ファイル', 5, 'test-novel-1');
     expect(results.length).toBe(1);
     expect(results[0].payload.file).toBe(keepFile);

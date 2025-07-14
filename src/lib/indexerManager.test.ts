@@ -9,6 +9,15 @@ vi.mock('../indexer.js');
 describe('IndexerManager', () => {
   let indexerManager: IndexerManager;
   let mockConfig: DialogoiConfig;
+  let mockIndexer: {
+    indexNovel: ReturnType<typeof vi.fn>;
+    removeNovelFromIndex: ReturnType<typeof vi.fn>;
+    search: ReturnType<typeof vi.fn>;
+    updateFile: ReturnType<typeof vi.fn>;
+    removeFile: ReturnType<typeof vi.fn>;
+    cleanup: ReturnType<typeof vi.fn>;
+    isReady: ReturnType<typeof vi.fn>;
+  };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -29,6 +38,18 @@ describe('IndexerManager', () => {
       },
     };
 
+    mockIndexer = {
+      indexNovel: vi.fn(),
+      removeNovelFromIndex: vi.fn(),
+      search: vi.fn().mockResolvedValue([]),
+      updateFile: vi.fn(),
+      removeFile: vi.fn(),
+      cleanup: vi.fn(),
+      isReady: vi.fn().mockReturnValue(true),
+    };
+
+    vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
+
     indexerManager = new IndexerManager(mockConfig);
   });
 
@@ -36,82 +57,31 @@ describe('IndexerManager', () => {
     await indexerManager.cleanup();
   });
 
-  describe('Indexer管理', () => {
-    it('新しいIndexerを作成できる', async () => {
-      const mockIndexer = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
+  describe('小説初期化管理', () => {
+    it('初期化済みノベルをトラッキングできる', async () => {
+      expect(indexerManager.hasInitialized('novel-1')).toBe(false);
 
-      vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
+      await indexerManager.search('novel-1', 'test query', 10);
 
-      const novelId = 'test-novel';
-      const indexer = await indexerManager.getOrCreateIndexer(novelId);
-
-      expect(Indexer).toHaveBeenCalledWith(mockConfig, novelId);
-      expect(mockIndexer.initialize).toHaveBeenCalled();
-      expect(indexer).toBe(mockIndexer);
+      expect(mockIndexer.indexNovel).toHaveBeenCalledWith('novel-1');
+      expect(indexerManager.hasInitialized('novel-1')).toBe(true);
     });
 
-    it('既存のIndexerを再利用する', async () => {
-      const mockIndexer = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
+    it('初期化済みノベルは再初期化されない', async () => {
+      await indexerManager.search('novel-1', 'test query', 10);
+      await indexerManager.search('novel-1', 'another query', 10);
 
-      vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
-
-      const novelId = 'test-novel';
-      const indexer1 = await indexerManager.getOrCreateIndexer(novelId);
-      const indexer2 = await indexerManager.getOrCreateIndexer(novelId);
-
-      expect(Indexer).toHaveBeenCalledTimes(1);
-      expect(mockIndexer.initialize).toHaveBeenCalledTimes(1);
-      expect(indexer1).toBe(indexer2);
+      expect(mockIndexer.indexNovel).toHaveBeenCalledTimes(1);
+      expect(mockIndexer.indexNovel).toHaveBeenCalledWith('novel-1');
     });
 
-    it('Indexerの存在確認ができる', async () => {
-      const novelId = 'test-novel';
+    it('異なるノベルは別々に初期化される', async () => {
+      await indexerManager.search('novel-1', 'test query', 10);
+      await indexerManager.search('novel-2', 'test query', 10);
 
-      expect(indexerManager.hasIndexer(novelId)).toBe(false);
-
-      await indexerManager.getOrCreateIndexer(novelId);
-
-      expect(indexerManager.hasIndexer(novelId)).toBe(true);
-    });
-
-    it('Indexerを削除できる', async () => {
-      const mockIndexer = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
-
-      vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
-
-      const novelId = 'test-novel';
-      await indexerManager.getOrCreateIndexer(novelId);
-
-      expect(indexerManager.hasIndexer(novelId)).toBe(true);
-
-      await indexerManager.removeIndexer(novelId);
-
-      expect(mockIndexer.cleanup).toHaveBeenCalled();
-      expect(indexerManager.hasIndexer(novelId)).toBe(false);
+      expect(mockIndexer.indexNovel).toHaveBeenCalledTimes(2);
+      expect(mockIndexer.indexNovel).toHaveBeenCalledWith('novel-1');
+      expect(mockIndexer.indexNovel).toHaveBeenCalledWith('novel-2');
     });
   });
 
@@ -119,183 +89,104 @@ describe('IndexerManager', () => {
     it('検索を実行できる', async () => {
       const mockResults = [
         {
-          id: 'test-chunk-1',
-          score: 0.95,
+          id: 'chunk-1',
+          score: 0.9,
           snippet: 'Test content',
           payload: {
             file: 'test.md',
             start: 1,
             end: 5,
-            tags: ['test'],
           },
         },
       ];
 
-      const mockIndexer = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue(mockResults),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
+      mockIndexer.search.mockResolvedValue(mockResults);
 
-      vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
+      const results = await indexerManager.search('novel-1', 'test query', 10);
 
-      const novelId = 'test-novel';
-      const query = 'test query';
-      const k = 10;
-
-      const results = await indexerManager.search(novelId, query, k);
-
-      expect(mockIndexer.search).toHaveBeenCalledWith(query, k, novelId);
+      expect(mockIndexer.indexNovel).toHaveBeenCalledWith('novel-1');
+      expect(mockIndexer.search).toHaveBeenCalledWith('test query', 10, 'novel-1');
       expect(results).toEqual(mockResults);
     });
 
     it('ファイル更新を実行できる', async () => {
-      const mockIndexer = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
+      await indexerManager.updateFile('novel-1', 'test.md');
 
-      vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
-
-      const novelId = 'test-novel';
-      const filePath = '/test/path/file.md';
-
-      await indexerManager.updateFile(novelId, filePath);
-
-      expect(mockIndexer.updateFile).toHaveBeenCalledWith(filePath);
+      expect(mockIndexer.indexNovel).toHaveBeenCalledWith('novel-1');
+      expect(mockIndexer.updateFile).toHaveBeenCalledWith('test.md', 'novel-1');
     });
 
     it('ファイル削除を実行できる', async () => {
-      const mockIndexer = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
+      await indexerManager.removeFile('novel-1', 'test.md');
 
-      vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
-
-      const novelId = 'test-novel';
-      const filePath = '/test/path/file.md';
-
-      await indexerManager.removeFile(novelId, filePath);
-
-      expect(mockIndexer.removeFile).toHaveBeenCalledWith(filePath);
+      expect(mockIndexer.indexNovel).toHaveBeenCalledWith('novel-1');
+      expect(mockIndexer.removeFile).toHaveBeenCalledWith('test.md');
     });
 
     it('インデックス再構築を実行できる', async () => {
-      const mockIndexer = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
+      // 最初に初期化して、再構築をテスト
+      await indexerManager.search('novel-1', 'test', 10);
+      await indexerManager.rebuildIndex('novel-1');
 
-      vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
+      expect(mockIndexer.removeNovelFromIndex).toHaveBeenCalledWith('novel-1');
+      expect(mockIndexer.indexNovel).toHaveBeenCalledTimes(2); // 初期化 + 再構築
+    });
+  });
 
-      const novelId = 'test-novel';
+  describe('インデックス管理', () => {
+    it('ノベルインデックスをクリアできる', async () => {
+      await indexerManager.search('novel-1', 'test', 10);
+      expect(indexerManager.hasInitialized('novel-1')).toBe(true);
 
-      await indexerManager.rebuildIndex(novelId);
+      await indexerManager.clearNovelIndex('novel-1');
 
-      expect(mockIndexer.buildFullIndex).toHaveBeenCalled();
+      expect(mockIndexer.removeNovelFromIndex).toHaveBeenCalledWith('novel-1');
+      expect(indexerManager.hasInitialized('novel-1')).toBe(false);
+    });
+
+    it('未初期化のノベルをクリアしても問題ない', async () => {
+      await indexerManager.clearNovelIndex('novel-1');
+
+      expect(mockIndexer.removeNovelFromIndex).not.toHaveBeenCalled();
+      expect(indexerManager.hasInitialized('novel-1')).toBe(false);
     });
   });
 
   describe('統計情報', () => {
-    it('Indexer一覧を取得できる', async () => {
-      const mockIndexer = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
+    it('初期化済みノベル一覧を取得できる', async () => {
+      await indexerManager.search('novel-1', 'test', 10);
+      await indexerManager.search('novel-2', 'test', 10);
 
-      vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
+      const novels = indexerManager.getInitializedNovels();
 
-      await indexerManager.getOrCreateIndexer('novel-1');
-      await indexerManager.getOrCreateIndexer('novel-2');
-
-      const list = indexerManager.getIndexerList();
-      expect(list).toEqual(['novel-1', 'novel-2']);
+      expect(novels).toEqual(['novel-1', 'novel-2']);
     });
 
     it('統計情報を取得できる', async () => {
-      const mockIndexer = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
-
-      vi.mocked(Indexer).mockImplementation(() => mockIndexer as unknown as Indexer);
-
-      await indexerManager.getOrCreateIndexer('novel-1');
-      await indexerManager.getOrCreateIndexer('novel-2');
+      await indexerManager.search('novel-1', 'test', 10);
+      await indexerManager.search('novel-2', 'test', 10);
 
       const stats = indexerManager.getStats();
-      expect(stats.totalIndexers).toBe(2);
-      expect(stats.indexers).toEqual([
-        { novelId: 'novel-1', isReady: true },
-        { novelId: 'novel-2', isReady: true },
+
+      expect(stats.totalInitializedNovels).toBe(2);
+      expect(stats.novels).toEqual([
+        { novelId: 'novel-1', isInitialized: true },
+        { novelId: 'novel-2', isInitialized: true },
       ]);
     });
   });
 
   describe('クリーンアップ', () => {
-    it('全てのIndexerをクリーンアップできる', async () => {
-      const mockIndexer1 = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
+    it('全てのインデックスをクリーンアップできる', async () => {
+      await indexerManager.search('novel-1', 'test', 10);
+      await indexerManager.search('novel-2', 'test', 10);
 
-      const mockIndexer2 = {
-        initialize: vi.fn(),
-        search: vi.fn().mockResolvedValue([]),
-        updateFile: vi.fn(),
-        removeFile: vi.fn(),
-        buildFullIndex: vi.fn(),
-        cleanup: vi.fn(),
-        isReady: vi.fn().mockReturnValue(true),
-      };
-
-      vi.mocked(Indexer)
-        .mockImplementationOnce(() => mockIndexer1 as unknown as Indexer)
-        .mockImplementationOnce(() => mockIndexer2 as unknown as Indexer);
-
-      await indexerManager.getOrCreateIndexer('novel-1');
-      await indexerManager.getOrCreateIndexer('novel-2');
+      expect(indexerManager.getInitializedNovels()).toEqual(['novel-1', 'novel-2']);
 
       await indexerManager.cleanup();
 
-      expect(mockIndexer1.cleanup).toHaveBeenCalled();
-      expect(mockIndexer2.cleanup).toHaveBeenCalled();
-      expect(indexerManager.getIndexerList()).toEqual([]);
+      expect(mockIndexer.cleanup).toHaveBeenCalled();
+      expect(indexerManager.getInitializedNovels()).toEqual([]);
     });
   });
 });

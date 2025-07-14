@@ -4,7 +4,7 @@ import { NovelService } from './novelService.js';
 
 // Use the actual novels directory that exists in the repository
 const novelsDir = path.join(process.cwd(), 'novels');
-const service = new NovelService(novelsDir);
+const service = new NovelService(novelsDir); // configなしでテスト（後方互換性）
 
 const SAMPLE_NOVEL_ID = 'sample_novel';
 
@@ -48,5 +48,12 @@ describe('NovelService (read-only operations)', () => {
     const content = await service.getNovelContent(SAMPLE_NOVEL_ID);
     expect(content.length).toBeGreaterThan(0);
     expect(content).toMatch(/chapter_1.txt/);
+  });
+
+  it('searchRag should throw error when IndexerManager is not set', async () => {
+    // configなしで作成されたサービスはIndexerManagerが設定されていない
+    await expect(service.searchRag(SAMPLE_NOVEL_ID, 'test query', 10)).rejects.toThrow(
+      'IndexerManager が設定されていません',
+    );
   });
 });

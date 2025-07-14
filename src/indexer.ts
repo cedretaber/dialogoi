@@ -16,12 +16,10 @@ export class Indexer {
   private chunkingStrategy: MarkdownChunkingStrategy;
   private config: DialogoiConfig;
   private projectRoot: string;
-  private novelId: string;
 
-  constructor(config: DialogoiConfig, novelId: string) {
+  constructor(config: DialogoiConfig) {
     this.config = config;
     this.projectRoot = path.resolve(config.projectRoot);
-    this.novelId = novelId;
 
     // KeywordFlexBackend の初期化
     this.backend = new KeywordFlexBackend({
@@ -34,23 +32,14 @@ export class Indexer {
   }
 
   /**
-   * インデックスを初期化
-   * ファイルをスキャンしてインデックスを構築
+   * 特定の小説プロジェクトのインデックスを構築
    */
-  async initialize(): Promise<void> {
-    console.error('📝 インデックスを構築します');
-    await this.buildFullIndex();
-  }
-
-  /**
-   * プロジェクト全体のフルインデックスを構築
-   */
-  async buildFullIndex(): Promise<void> {
+  async indexNovel(novelId: string): Promise<void> {
     const startTime = Date.now();
-    console.error('🔍 プロジェクトファイルを走査中...');
+    console.error(`🔍 小説プロジェクト "${novelId}" のファイルを走査中...`);
 
     // ターゲットファイルを検索（*.md, *.txt）
-    const files = await this.findTargetFiles();
+    const files = await this.findTargetFiles(novelId);
     console.error(`📄 ${files.length} 個のファイルを発見`);
 
     let totalChunks = 0;
@@ -58,7 +47,7 @@ export class Indexer {
     // 各ファイルを処理
     for (const filePath of files) {
       try {
-        const chunks = await this.processFile(filePath);
+        const chunks = await this.processFile(filePath, novelId);
         totalChunks += chunks.length;
         console.error(
           `  ✓ ${path.relative(this.projectRoot, filePath)}: ${chunks.length} チャンク`,
@@ -68,16 +57,16 @@ export class Indexer {
       }
     }
 
-    // インデックスはメモリ内に保持（エクスポート不要）
-
     const duration = Date.now() - startTime;
-    console.error(`🎉 インデックス構築完了: ${totalChunks} チャンク, ${duration}ms`);
+    console.error(
+      `🎉 小説プロジェクト "${novelId}" のインデックス構築完了: ${totalChunks} チャンク, ${duration}ms`,
+    );
   }
 
   /**
    * 単一ファイルを処理してチャンクを生成・追加
    */
-  async processFile(filePath: string): Promise<Chunk[]> {
+  async processFile(filePath: string, novelId: string): Promise<Chunk[]> {
     const content = await fs.readFile(filePath, 'utf-8');
     const relativePath = path.relative(this.projectRoot, filePath);
 
@@ -87,7 +76,7 @@ export class Indexer {
       relativePath,
       this.config.chunk.maxTokens,
       this.config.chunk.overlap,
-      this.novelId,
+      novelId,
     );
 
     // ChunkDataはそのままChunkとして使用可能
@@ -100,13 +89,11 @@ export class Indexer {
   }
 
   /**
-   * ターゲットファイル（*.md, *.txt）を検索
+   * 特定の小説プロジェクトのターゲットファイル（*.md, *.txt）を検索
    */
-  private async findTargetFiles(): Promise<string[]> {
-    const patterns = [
-      path.join(this.projectRoot, '**/*.md'),
-      path.join(this.projectRoot, '**/*.txt'),
-    ];
+  private async findTargetFiles(novelId: string): Promise<string[]> {
+    const novelPath = path.join(this.projectRoot, novelId);
+    const patterns = [path.join(novelPath, '**/*.md'), path.join(novelPath, '**/*.txt')];
 
     const files: string[] = [];
     for (const pattern of patterns) {
@@ -120,18 +107,15 @@ export class Indexer {
     return [...new Set(files)].sort();
   }
 
-  // import/exportメソッドは削除（メモリ内インデックスのみ使用）
-
   /**
    * ファイル更新時の増分更新
    */
-  async updateFile(filePath: string): Promise<void> {
+  async updateFile(filePath: string, novelId: string): Promise<void> {
     try {
-      // 既存のチャンクを削除
       await this.removeFileChunks(filePath);
 
       // 新しいチャンクを追加
-      await this.processFile(filePath);
+      await this.processFile(filePath, novelId);
 
       console.error(`🔄 ファイルを更新しました: ${path.relative(this.projectRoot, filePath)}`);
     } catch (error) {
@@ -155,7 +139,6 @@ export class Indexer {
    * 特定ファイルのチャンクを削除
    */
   private async removeFileChunks(filePath: string): Promise<void> {
-    // removeByFileメソッドを使用してファイル単位で削除
     await this.backend.removeByFile(filePath);
   }
 
@@ -171,6 +154,14 @@ export class Indexer {
    */
   isReady(): boolean {
     return this.backend.isReady();
+  }
+
+  /**
+   * 特定の小説プロジェクトのデータをインデックスから削除
+   */
+  async removeNovelFromIndex(novelId: string): Promise<void> {
+    await this.backend.removeByNovel(novelId);
+    console.error(`🗑️ 小説プロジェクト "${novelId}" のインデックスを削除しました`);
   }
 
   /**
