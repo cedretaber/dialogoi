@@ -38,12 +38,14 @@ const listNovelSettingsInput = z.object({
 
 const searchNovelSettingsInput = z.object({
   novelId: z.string().describe('小説のID'),
-  keyword: z.string().describe('検索キーワード'),
+  keyword: z.string().describe('検索キーワード（正規表現も可能）'),
+  useRegex: z.boolean().optional().describe('正規表現として検索するかどうか（デフォルト: false）'),
 });
 
 const searchNovelContentInput = z.object({
   novelId: z.string().describe('小説のID'),
-  keyword: z.string().describe('検索キーワード'),
+  keyword: z.string().describe('検索キーワード（正規表現も可能）'),
+  useRegex: z.boolean().optional().describe('正規表現として検索するかどうか（デフォルト: false）'),
 });
 
 const getNovelSettingsInput = z.object({
@@ -81,19 +83,24 @@ server.registerTool(
 server.registerTool(
   'search_novel_settings',
   {
-    description: '小説の設定ファイルからキーワードを検索します',
+    description: '小説の設定ファイルからキーワードを検索します（正規表現検索も可能）',
     inputSchema: searchNovelSettingsInput.shape,
   },
-  async (params: { novelId: string; keyword: string }) => {
+  async (params: { novelId: string; keyword: string; useRegex?: boolean }) => {
     try {
-      const searchResults = await novelService.searchNovelSettings(params.novelId, params.keyword);
+      const searchResults = await novelService.searchNovelSettings(
+        params.novelId,
+        params.keyword,
+        params.useRegex || false,
+      );
 
       if (searchResults.length === 0) {
+        const searchType = params.useRegex ? '正規表現' : 'キーワード';
         return {
           content: [
             {
               type: 'text' as const,
-              text: `キーワード「${params.keyword}」に一致する設定ファイルが見つかりませんでした。`,
+              text: `${searchType}「${params.keyword}」に一致する設定ファイルが見つかりませんでした。`,
             },
           ],
         };
@@ -145,19 +152,24 @@ server.registerTool(
 server.registerTool(
   'search_novel_content',
   {
-    description: '小説の本文ファイルからキーワードを検索します',
+    description: '小説の本文ファイルからキーワードを検索します（正規表現検索も可能）',
     inputSchema: searchNovelContentInput.shape,
   },
-  async (params: { novelId: string; keyword: string }) => {
+  async (params: { novelId: string; keyword: string; useRegex?: boolean }) => {
     try {
-      const searchResults = await novelService.searchNovelContent(params.novelId, params.keyword);
+      const searchResults = await novelService.searchNovelContent(
+        params.novelId,
+        params.keyword,
+        params.useRegex || false,
+      );
 
       if (searchResults.length === 0) {
+        const searchType = params.useRegex ? '正規表現' : 'キーワード';
         return {
           content: [
             {
               type: 'text' as const,
-              text: `キーワード「${params.keyword}」に一致する本文ファイルが見つかりませんでした。`,
+              text: `${searchType}「${params.keyword}」に一致する本文ファイルが見つかりませんでした。`,
             },
           ],
         };

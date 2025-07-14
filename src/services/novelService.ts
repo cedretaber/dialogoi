@@ -85,10 +85,25 @@ export class NovelService {
     keyword: string,
     directories: string[],
     extensions: string[],
+    useRegex: boolean = false,
   ): Promise<Array<{ filename: string; matchingLines: string[] }>> {
     const project = await this.getValidatedProject(novelId);
 
     const searchResults: Array<{ filename: string; matchingLines: string[] }> = [];
+
+    // 正規表現パターンを作成
+    let searchPattern: RegExp;
+    if (useRegex) {
+      try {
+        searchPattern = new RegExp(keyword, 'i'); // 大文字小文字を区別しない
+      } catch (error) {
+        throw new Error(`無効な正規表現: ${keyword}`);
+      }
+    } else {
+      // 通常の文字列検索の場合は、正規表現特殊文字をエスケープ
+      const escapedKeyword = keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      searchPattern = new RegExp(escapedKeyword, 'i');
+    }
 
     // 指定されたディレクトリから全ファイルを検索
     for (const directory of directories) {
@@ -101,9 +116,9 @@ export class NovelService {
           const lines = data.split('\n');
           const matchingLines: string[] = [];
 
-          // キーワードを含む行を検索（大文字小文字を区別しない）
+          // パターンに一致する行を検索
           for (let i = 0; i < lines.length; i++) {
-            if (lines[i].toLowerCase().includes(keyword.toLowerCase())) {
+            if (searchPattern.test(lines[i])) {
               // マッチした行とその前後の文脈を含める
               const contextStart = Math.max(0, i - 1);
               const contextEnd = Math.min(lines.length - 1, i + 1);
@@ -198,19 +213,33 @@ export class NovelService {
   async searchNovelSettings(
     novelId: string,
     keyword: string,
+    useRegex: boolean = false,
   ): Promise<Array<{ filename: string; matchingLines: string[] }>> {
     const project = await this.getValidatedProject(novelId);
     const extensions = ['md', 'txt'];
-    return this.searchFiles(novelId, keyword, project.config.settingsDirectories, extensions);
+    return this.searchFiles(
+      novelId,
+      keyword,
+      project.config.settingsDirectories,
+      extensions,
+      useRegex,
+    );
   }
 
   async searchNovelContent(
     novelId: string,
     keyword: string,
+    useRegex: boolean = false,
   ): Promise<Array<{ filename: string; matchingLines: string[] }>> {
     const project = await this.getValidatedProject(novelId);
     const extensions = ['txt', 'md'];
-    return this.searchFiles(novelId, keyword, project.config.contentDirectories, extensions);
+    return this.searchFiles(
+      novelId,
+      keyword,
+      project.config.contentDirectories,
+      extensions,
+      useRegex,
+    );
   }
 
   async getNovelContent(novelId: string, filename?: string): Promise<string> {

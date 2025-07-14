@@ -44,33 +44,33 @@ flowchart TD
 ```ts
 export class Chunk {
   constructor(
-    public title: string,      // 章・節タイトル
-    public content: string,    // チャンク本文
-    public filePath: string,   // ファイルパス
-    public startLine: number,  // 開始行番号
-    public endLine: number,    // 終了行番号
+    public title: string, // 章・節タイトル
+    public content: string, // チャンク本文
+    public filePath: string, // ファイルパス
+    public startLine: number, // 開始行番号
+    public endLine: number, // 終了行番号
     public chunkIndex: number, // チャンク番号
-    public novelId: string,    // 小説プロジェクトID
-    public tags?: string[]     // オプションのタグ
+    public novelId: string, // 小説プロジェクトID
+    public tags?: string[], // オプションのタグ
   ) {}
 
-  get baseId(): string // ハッシュなしのベースID
-  get id(): string     // ハッシュ付きの一意ID
-  get hash(): string   // タイトル+コンテンツのMD5ハッシュ（8文字）
+  get baseId(): string; // ハッシュなしのベースID
+  get id(): string; // ハッシュ付きの一意ID
+  get hash(): string; // タイトル+コンテンツのMD5ハッシュ（8文字）
 }
 ```
 
 ### 3.2 WordDocument（形態素解析結果）
 
-| フィールド | 型       | 説明                       |
-| ---------- | -------- | -------------------------- |
-| `id`       | `number` | ユニークID                 |
-| `word`     | `string` | 表層形                     |
-| `basic`    | `string` | 基本形                     |
-| `reading`  | `string` | 読み（カタカナ）           |
-| `pos`      | `string` | 品詞                       |
-| `chunkId`  | `string` | 所属チャンクID             |
-| `novelId`  | `string` | 小説プロジェクトID         |
+| フィールド | 型       | 説明               |
+| ---------- | -------- | ------------------ |
+| `id`       | `number` | ユニークID         |
+| `word`     | `string` | 表層形             |
+| `basic`    | `string` | 基本形             |
+| `reading`  | `string` | 読み（カタカナ）   |
+| `pos`      | `string` | 品詞               |
+| `chunkId`  | `string` | 所属チャンクID     |
+| `novelId`  | `string` | 小説プロジェクトID |
 
 **FlexSearch 設定（KeywordFlexBackend）**
 
@@ -91,13 +91,13 @@ document: {
 
 ## 4 依存ライブラリ
 
-| パッケージ            | バージョン | 用途                       |
-| --------------------- | ---------- | -------------------------- |
-| `flexsearch`          | ^0.8.2     | 全文検索 (Document Search) |
-| `kuromojin`           | ^3.0.1     | 日本語形態素解析           |
-| `@modelcontextprotocol/sdk` | ^1.12.3 | MCPサーバー実装      |
-| `dotenv`              | ^16.4.5    | 環境変数管理               |
-| `zod`                 | ^3.25.67   | スキーマ検証               |
+| パッケージ                  | バージョン | 用途                       |
+| --------------------------- | ---------- | -------------------------- |
+| `flexsearch`                | ^0.8.2     | 全文検索 (Document Search) |
+| `kuromojin`                 | ^3.0.1     | 日本語形態素解析           |
+| `@modelcontextprotocol/sdk` | ^1.12.3    | MCPサーバー実装            |
+| `dotenv`                    | ^16.4.5    | 環境変数管理               |
+| `zod`                       | ^3.25.67   | スキーマ検証               |
 
 Node 20 以上で標準機能を活用。
 
@@ -172,7 +172,7 @@ MCPツール → NovelService.searchRag() → IndexerManager → KeywordFlexBack
   id: string,
   score: number,    // 0–1 正規化スコア
   snippet: string,  // マッチ箇所の周辺テキスト
-  payload: { 
+  payload: {
     file: string,
     start: number,
     end: number,

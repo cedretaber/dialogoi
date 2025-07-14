@@ -44,10 +44,36 @@ describe('NovelService (read-only operations)', () => {
     expect(Array.isArray(results)).toBe(true);
   });
 
+  it('searchNovelSettings should support regex search', async () => {
+    // Test regex search with a simple pattern
+    const results = await service.searchNovelSettings(
+      SAMPLE_NOVEL_ID,
+      'キャラクター|character',
+      true,
+    );
+    expect(Array.isArray(results)).toBe(true);
+
+    // Test invalid regex should throw error
+    await expect(
+      service.searchNovelSettings(SAMPLE_NOVEL_ID, '[invalid regex', true),
+    ).rejects.toThrow('無効な正規表現');
+  });
+
   it('getNovelContent should return concatenated content text', async () => {
     const content = await service.getNovelContent(SAMPLE_NOVEL_ID);
     expect(content.length).toBeGreaterThan(0);
     expect(content).toMatch(/chapter_1.txt/);
+  });
+
+  it('searchNovelContent should support regex search', async () => {
+    // Test regex search with a simple pattern
+    const results = await service.searchNovelContent(SAMPLE_NOVEL_ID, 'chapter|チャプター', true);
+    expect(Array.isArray(results)).toBe(true);
+
+    // Test invalid regex should throw error
+    await expect(
+      service.searchNovelContent(SAMPLE_NOVEL_ID, '[invalid regex', true),
+    ).rejects.toThrow('無効な正規表現');
   });
 
   it('searchRag should throw error when IndexerManager is not set', async () => {
