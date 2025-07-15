@@ -66,18 +66,23 @@ export class IndexerManager {
 
   /**
    * 指定された小説IDのファイルを更新
-   * @param novelId 小説ID
-   * @param filePath ファイルパス
+   * @param novelId 小説プロジェクトID
+   * @param filePath 更新対象ファイルの絶対パス
    */
   async updateFile(novelId: string, filePath: string): Promise<void> {
-    await this.ensureNovelInitialized(novelId);
+    // 初期化されていない場合のみ初期化を実行
+    if (!this.initializedNovels.has(novelId)) {
+      await this.ensureNovelInitialized(novelId);
+      return; // 初期化で全ファイルが既にインデックスされているため、個別のupdateFileは不要
+    }
+
     await this.indexer.updateFile(filePath, novelId);
   }
 
   /**
    * 指定された小説IDのファイルを削除
-   * @param novelId 小説ID
-   * @param filePath ファイルパス
+   * @param novelId 小説プロジェクトID
+   * @param filePath 削除対象ファイルの絶対パス
    */
   async removeFile(novelId: string, filePath: string): Promise<void> {
     await this.ensureNovelInitialized(novelId);

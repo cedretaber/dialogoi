@@ -65,6 +65,9 @@ export class Indexer {
 
   /**
    * 単一ファイルを処理してチャンクを生成・追加
+   * @param filePath 処理対象ファイルの絶対パス
+   * @param novelId 小説プロジェクトID
+   * @returns 生成されたチャンク配列
    */
   async processFile(filePath: string, novelId: string): Promise<Chunk[]> {
     const content = await fs.readFile(filePath, 'utf-8');
@@ -116,15 +119,19 @@ export class Indexer {
 
   /**
    * ファイル更新時の増分更新
+   * @param filePath 更新対象ファイルの絶対パス
+   * @param novelId 小説プロジェクトID
    */
   async updateFile(filePath: string, novelId: string): Promise<void> {
     try {
-      await this.removeFileChunks(filePath);
+      // 相対パスに変換して削除
+      const relativePath = path.relative(this.projectRoot, filePath);
+      await this.removeFileChunks(relativePath);
 
       // 新しいチャンクを追加
       await this.processFile(filePath, novelId);
 
-      console.error(`🔄 ファイルを更新しました: ${path.relative(this.projectRoot, filePath)}`);
+      console.error(`🔄 ファイルを更新しました: ${relativePath}`);
     } catch (error) {
       console.error(`❌ ファイル更新エラー: ${filePath}`, error);
     }
@@ -132,11 +139,14 @@ export class Indexer {
 
   /**
    * ファイル削除時の処理
+   * @param filePath 削除対象ファイルの絶対パス
    */
   async removeFile(filePath: string): Promise<void> {
     try {
-      await this.removeFileChunks(filePath);
-      console.error(`🗑️ ファイルを削除しました: ${path.relative(this.projectRoot, filePath)}`);
+      // 相対パスに変換して削除
+      const relativePath = path.relative(this.projectRoot, filePath);
+      await this.removeFileChunks(relativePath);
+      console.error(`🗑️ ファイルを削除しました: ${relativePath}`);
     } catch (error) {
       console.error(`❌ ファイル削除エラー: ${filePath}`, error);
     }
@@ -144,6 +154,7 @@ export class Indexer {
 
   /**
    * 特定ファイルのチャンクを削除
+   * @param filePath プロジェクトルートからの相対パス
    */
   private async removeFileChunks(filePath: string): Promise<void> {
     await this.backend.removeByFile(filePath);

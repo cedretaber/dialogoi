@@ -26,7 +26,7 @@ interface WordPosition {
   chunkInfo: {
     // チャンク情報
     chunkId: string; // チャンクID
-    filePath: string; // ファイルパス
+    filePath: string; // プロジェクトルートからの相対パス (例: "sample_novel/contents/chapter_1.txt")
     startLine: number; // チャンク開始行
     endLine: number; // チャンク終了行
     chunkIndex: number; // チャンクインデックス
@@ -45,7 +45,7 @@ interface WordDocument extends DocumentData {
   pos: string; // 品詞
   charOffset: number; // チャンク内文字オフセット
   chunkId: string; // チャンクID
-  filePath: string; // ファイルパス
+  filePath: string; // プロジェクトルートからの相対パス (例: "sample_novel/contents/chapter_1.txt")
   startLine: number; // チャンク開始行
   endLine: number; // チャンク終了行
   chunkIndex: number; // チャンクインデックス
@@ -420,6 +420,7 @@ export class KeywordFlexBackend extends SearchBackend {
 
   /**
    * 指定ファイルに関連する単語をすべて削除
+   * @param filePath プロジェクトルートからの相対パス (例: "sample_novel/contents/chapter_1.txt")
    */
   async removeByFile(filePath: string): Promise<void> {
     await this.initializeIndex();
@@ -434,16 +435,17 @@ export class KeywordFlexBackend extends SearchBackend {
     });
 
     if (Array.isArray(searchResults)) {
-      let removedCount = 0;
       for (const result of searchResults) {
         if (Array.isArray(result.result)) {
           for (const id of result.result) {
-            this.wordIndex.remove(id);
-            removedCount++;
+            try {
+              this.wordIndex!.remove(id);
+            } catch (error) {
+              console.error(`削除エラー ID: ${id}`, error);
+            }
           }
         }
       }
-      console.error(`🗑️ ファイル削除: ${filePath} (${removedCount}個のチャンク)`);
     }
   }
 
@@ -464,15 +466,24 @@ export class KeywordFlexBackend extends SearchBackend {
 
     if (Array.isArray(searchResults)) {
       let removedCount = 0;
+      let attemptedRemovals = 0;
+
       for (const result of searchResults) {
         if (Array.isArray(result.result)) {
           for (const id of result.result) {
-            this.wordIndex.remove(id);
-            removedCount++;
+            try {
+              this.wordIndex!.remove(id);
+              removedCount++;
+              attemptedRemovals++;
+            } catch (error) {
+              console.error(`削除エラー ID: ${id}`, error);
+              attemptedRemovals++;
+            }
           }
         }
       }
-      console.error(`🗑️ 小説削除: ${novelId} (${removedCount}個のチャンク)`);
+
+      console.error(`🗑️ 小説削除: ${novelId} (${removedCount}/${attemptedRemovals}個のチャンク)`);
     }
   }
 

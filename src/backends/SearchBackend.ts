@@ -22,7 +22,7 @@ export class Chunk {
   constructor(
     public title: string, // 章・節タイトル
     public content: string, // チャンク本文
-    public filePath: string, // ファイルパス
+    public filePath: string, // プロジェクトルートからの相対パス (例: "sample_novel/contents/chapter_1.txt")
     public startLine: number, // 開始行番号
     public endLine: number, // 終了行番号
     public chunkIndex: number, // チャンク番号

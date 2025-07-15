@@ -112,7 +112,23 @@ describe('IndexerManager', () => {
     it('ファイル更新を実行できる', async () => {
       await indexerManager.updateFile('novel-1', 'test.md');
 
+      // 未初期化の小説は初期化のみ行い、個別のupdateFileは呼び出さない
       expect(mockIndexer.indexNovel).toHaveBeenCalledWith('novel-1');
+      expect(mockIndexer.updateFile).not.toHaveBeenCalled();
+    });
+
+    it('既に初期化済みの小説に対してファイル更新を実行できる', async () => {
+      // 先に初期化を実行
+      await indexerManager.updateFile('novel-1', 'initial.md');
+      
+      // モックをリセット
+      vi.clearAllMocks();
+      
+      // 既に初期化済みの小説に対してファイル更新を実行
+      await indexerManager.updateFile('novel-1', 'test.md');
+
+      // 初期化は呼び出されず、updateFileのみ呼び出される
+      expect(mockIndexer.indexNovel).not.toHaveBeenCalled();
       expect(mockIndexer.updateFile).toHaveBeenCalledWith('test.md', 'novel-1');
     });
 
