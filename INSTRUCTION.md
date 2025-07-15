@@ -111,8 +111,15 @@ dialogoi/
 │  ├─ backends/
 │  │   ├─ SearchBackend.ts      # 抽象インターフェース
 │  │   └─ KeywordFlexBackend.ts # 形態素解析ベース実装
+│  ├─ repositories/
+│  │   ├─ NovelRepository.ts           # データアクセス層インターフェース
+│  │   └─ FileSystemNovelRepository.ts # ファイルシステム実装
 │  ├─ services/
-│  │   └─ novelService.ts       # 小説プロジェクト管理
+│  │   ├─ novelService.ts              # 小説プロジェクト管理ファサード
+│  │   ├─ SearchService.ts             # 検索サービスインターフェース
+│  │   ├─ IndexerSearchService.ts      # Indexer検索サービス実装
+│  │   ├─ FileOperationsService.ts     # ファイル操作インターフェース
+│  │   └─ IndexerFileOperationsService.ts # Indexerファイル操作実装
 │  ├─ lib/
 │  │   ├─ chunker.ts            # 再帰チャンク化ヘルパ
 │  │   ├─ morphAnalyzer.ts      # 日本語形態素解析
@@ -124,6 +131,15 @@ dialogoi/
 │  │   └─ novel.ts              # ドメインモデル
 │  ├─ dto/
 │  │   └─ novelDto.ts           # MCPレスポンス型定義
+│  ├─ errors/
+│  │   ├─ DialogoiError.ts      # エラー階層定義
+│  │   ├─ ErrorHandler.ts       # エラーハンドリングユーティリティ
+│  │   └─ index.ts              # エラー型エクスポート
+│  ├─ logging/
+│  │   ├─ Logger.ts             # ログインターフェース
+│  │   ├─ ConsoleLogger.ts      # コンソールログ実装
+│  │   ├─ LoggerFactory.ts      # ロガーファクトリ
+│  │   └─ index.ts              # ログ型エクスポート
 │  ├─ indexer.ts                # 単一インデックス管理
 │  └─ index.ts                  # MCPサーバーエントリポイント
 ├─ config/
@@ -407,91 +423,95 @@ npm t
    - strictNullChecksの徹底 ✅ Optional型活用
    - unknown型の適切な使用 ✅ ErrorHandler実装
 
-#### Phase 2: アーキテクチャ改善（優先度：高） 🚧 **進行中**
+#### Phase 2: アーキテクチャ改善（優先度：高） ✅ **完了 (2025-01-15)**
 
 **目標**: 責任の分離と拡張性の向上
 
-1. **Repositoryパターンの導入** 📋 **未着手**
+1. **Repositoryパターンの導入** ✅ **完了**
 
    ```typescript
    interface NovelRepository {
-     listProjects(): Promise<NovelProject[]>;
-     getProject(id: string): Promise<NovelProject>;
-     getSettings(projectId: string): Promise<NovelSettings>;
-     getContent(projectId: string): Promise<NovelContent>;
+     listProjects(): Promise<Array<{ id: string; title: string; description?: string }>>;
+     getProject(projectId: string): Promise<NovelProject>;
+     listSettingsFiles(projectId: string): Promise<FileInfo[]>;
+     getSettingsContent(projectId: string, filename?: string): Promise<string>;
+     searchSettingsFiles(
+       projectId: string,
+       keyword: string,
+       useRegex?: boolean,
+     ): Promise<KeywordSearchResult[]>;
+     // ... その他のメソッド
    }
    ```
 
-   **実装予定:**
+   **実装完了:**
    - `src/repositories/NovelRepository.ts`: インターフェース定義
    - `src/repositories/FileSystemNovelRepository.ts`: ファイルシステム実装
    - NovelServiceからデータアクセス層を分離
 
-2. **検索サービスの分離** 📋 **未着手**
+2. **検索サービスの分離** ✅ **完了**
 
    ```typescript
    interface SearchService {
-     search(projectId: string, query: string, options: SearchOptions): Promise<SearchResult[]>;
+     searchRag(projectId: string, query: string, options?: SearchOptions): Promise<SearchResult[]>;
+     searchSettingsFiles(
+       projectId: string,
+       keyword: string,
+       options?: SearchOptions,
+     ): Promise<KeywordSearchResult[]>;
+     searchContentFiles(
+       projectId: string,
+       keyword: string,
+       options?: SearchOptions,
+     ): Promise<KeywordSearchResult[]>;
+     // ファイル監視メソッド群
    }
    ```
 
-   **実装予定:**
+   **実装完了:**
    - `src/services/SearchService.ts`: 検索ロジック分離
+   - `src/services/IndexerSearchService.ts`: Indexer実装
    - NovelServiceから検索機能を独立
 
-3. **ファイル操作サービスの抽出** 📋 **未着手**
+3. **ファイル操作サービスの抽出** ✅ **完了**
 
    ```typescript
    interface FileOperationsService {
-     readFile(path: string): Promise<string>;
-     writeFile(path: string, content: string): Promise<void>;
-     listFiles(dir: string, extensions: string[]): Promise<string[]>;
+     createSettingsFile(
+       projectId: string,
+       directory: string,
+       filename: string,
+       content: string,
+       options?: FileCreationOptions,
+     ): Promise<void>;
+     createContentFile(
+       projectId: string,
+       directory: string,
+       filename: string,
+       content: string,
+       options?: FileCreationOptions,
+     ): Promise<void>;
+     notifyFileUpdate(projectId: string, filePath: string): Promise<void>;
    }
    ```
 
-   **実装予定:**
+   **実装完了:**
    - `src/services/FileOperationsService.ts`: ファイルI/O抽象化
+   - `src/services/IndexerFileOperationsService.ts`: Indexer連携実装
    - セキュリティチェック機能の統合
 
-#### Phase 3: パフォーマンス最適化（優先度：中） 📋 **未着手**
+4. **NovelServiceのリファクタリング** ✅ **完了**
+   - 依存性注入によるファサードパターン実装
+   - Repository、SearchService、FileOperationsServiceを統合
+   - 既存のMCP API互換性を維持
 
-**目標**: スケーラビリティとレスポンス改善
+5. **包括的テスト作成** ✅ **完了**
+   - FileSystemNovelRepository.test.ts: 23テスト
+   - IndexerSearchService.test.ts: 17テスト
+   - IndexerFileOperationsService.test.ts: 14テスト
+   - 全158テスト通過
 
-1. **プロジェクトスコープのIndexer管理** 📋 **未着手**
-
-   ```typescript
-   class IndexerFactory {
-     private indexers: Map<string, Indexer>;
-
-     getIndexer(projectId: string): Indexer {
-       // 遅延初期化、プロジェクト毎に独立したIndexer
-     }
-   }
-   ```
-
-   **実装予定:**
-   - IndexerManagerから個別プロジェクトIndexer管理を分離
-   - メモリ効率化とスケーラビリティ向上
-
-2. **キャッシュレイヤーの実装** 📋 **未着手**
-
-   ```typescript
-   interface CacheService {
-     get<T>(key: string): Promise<T | null>;
-     set<T>(key: string, value: T, ttl?: number): Promise<void>;
-     invalidate(pattern: string): Promise<void>;
-   }
-   ```
-
-   **実装予定:**
-   - 検索結果キャッシュ機能
-   - TTL対応、パターンマッチ無効化
-
-3. **検索結果のストリーミング** 📋 **未着手**
-   - 大量結果のページネーション
-   - AsyncIteratorによる逐次処理
-
-#### Phase 4: Qdrant統合準備（優先度：中） 📋 **未着手**
+#### Phase 3: Qdrant統合準備（優先度：高） 📋 **未着手**
 
 **目標**: ベクトル検索への移行準備
 
@@ -549,24 +569,29 @@ npm t
 
 ### 14.3 進捗サマリー
 
-**全体進捗: 25% (Phase 1完了)**
+**全体進捗: 67% (Phase 1-2完了、Phase 3スキップ)**
 
 - ✅ **Phase 1 (基盤整備)**: 完了 (2025-01-15)
   - 統一エラーハンドリング、ロギング、型安全性すべて実装済み
   - テスト104個すべて通過、lint/typecheck問題なし
-- 🚧 **Phase 2 (アーキテクチャ改善)**: 進行中
-  - Repository、SearchService、FileOperationsService分離予定
-- 📋 **Phase 3 (パフォーマンス最適化)**: 未着手
-- 📋 **Phase 4 (Qdrant統合準備)**: 未着手
+- ✅ **Phase 2 (アーキテクチャ改善)**: 完了 (2025-01-15)
+  - Repository、SearchService、FileOperationsService分離完了
+  - 依存性注入、ファサードパターン実装
+  - 54個の新規テスト追加、全158テスト通過
+- ⏭️ **Phase 3 (パフォーマンス最適化)**: スキップ
+  - FlexSearch将来廃止予定のため最適化コストを回避
+- 📋 **Phase 3 (Qdrant統合準備)**: 未着手（次フェーズ）
 
 ### 14.4 実装スケジュール
 
-| フェーズ | 期間（目安） | 優先度 | 依存関係 |
-| -------- | ------------ | ------ | -------- |
-| Phase 1  | 1週間        | 高     | なし     |
-| Phase 2  | 2週間        | 高     | Phase 1  |
-| Phase 3  | 1週間        | 中     | Phase 2  |
-| Phase 4  | 1週間        | 中     | Phase 2  |
+| フェーズ    | 期間（目安） | 優先度 | 依存関係    | 状況          |
+| ----------- | ------------ | ------ | ----------- | ------------- |
+| Phase 1     | 1週間        | 高     | なし        | ✅ 完了       |
+| Phase 2     | 2週間        | 高     | Phase 1     | ✅ 完了       |
+| ~~Phase 3~~ | ~~1週間~~    | ~~中~~ | ~~Phase 2~~ | ⏭️ スキップ   |
+| Phase 3     | 1週間        | 高     | Phase 2     | 📋 次フェーズ |
+
+**注**: 旧Phase 3（パフォーマンス最適化）をスキップし、旧Phase 4（Qdrant統合準備）を新Phase 3として実行します。FlexSearchの最適化は将来の技術移行により不要と判断されました。
 
 ### 14.5 テスト戦略
 

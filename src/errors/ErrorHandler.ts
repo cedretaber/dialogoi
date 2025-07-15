@@ -1,4 +1,4 @@
-import { DialogoiError } from './DialogoiError';
+import { DialogoiError } from './DialogoiError.js';
 
 /**
  * エラーハンドリングのユーティリティクラス

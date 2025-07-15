@@ -3,6 +3,10 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import dotenv from 'dotenv';
 import { z } from 'zod';
 import { NovelService } from './services/novelService.js';
+import { FileSystemNovelRepository } from './repositories/FileSystemNovelRepository.js';
+import { IndexerSearchService } from './services/IndexerSearchService.js';
+import { IndexerFileOperationsService } from './services/IndexerFileOperationsService.js';
+import { IndexerManager } from './lib/indexerManager.js';
 import path from 'path';
 import { loadConfig } from './lib/config.js';
 
@@ -24,8 +28,12 @@ console.error(
   `🔍 検索設定: defaultK=${dialogoiConfig.search.defaultK}, maxK=${dialogoiConfig.search.maxK}`,
 );
 
-// NovelServiceを初期化（内部でIndexerManagerも初期化）
-const novelService = new NovelService(baseDir, dialogoiConfig);
+// リファクタリング後のアーキテクチャで各サービスを初期化
+const novelRepository = new FileSystemNovelRepository(baseDir);
+const indexerManager = new IndexerManager(dialogoiConfig);
+const searchService = new IndexerSearchService(novelRepository, indexerManager);
+const fileOperationsService = new IndexerFileOperationsService(novelRepository, indexerManager);
+const novelService = new NovelService(novelRepository, searchService, fileOperationsService);
 
 // ファイル監視を開始
 (async () => {

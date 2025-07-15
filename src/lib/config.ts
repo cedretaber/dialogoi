@@ -148,7 +148,7 @@ export function loadConfig(configPath?: string): DialogoiConfig {
     fileConfig = JSON.parse(configContent) as Partial<DialogoiConfig>;
     console.error(`✅ 設定ファイルをロードしました: ${targetPath}`);
   } catch (error) {
-    console.warn(`⚠️  設定ファイルが見つかりません: ${targetPath}`);
+    console.error(`⚠️  設定ファイルが見つかりません: ${targetPath}`);
     console.error('📝 デフォルト設定を使用します');
   }
 

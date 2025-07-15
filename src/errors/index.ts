@@ -15,7 +15,7 @@ export {
   FileWriteError,
   ConfigurationError,
   ConfigLoadError,
-} from './DialogoiError';
+} from './DialogoiError.js';
 
 // エラーハンドリングユーティリティ関数
-export { ErrorHandler } from './ErrorHandler';
+export { ErrorHandler } from './ErrorHandler.js';

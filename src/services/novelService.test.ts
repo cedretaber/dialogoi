@@ -1,10 +1,22 @@
 import { describe, it, expect } from 'vitest';
 import path from 'path';
 import { NovelService } from './novelService.js';
+import { FileSystemNovelRepository } from '../repositories/FileSystemNovelRepository.js';
+import { IndexerSearchService } from './IndexerSearchService.js';
+import { IndexerFileOperationsService } from './IndexerFileOperationsService.js';
+import { IndexerManager } from '../lib/indexerManager.js';
+import { loadConfig } from '../lib/config.js';
 
 // Use the actual novels directory that exists in the repository
 const novelsDir = path.join(process.cwd(), 'novels');
-const service = new NovelService(novelsDir); // configなしでテスト（後方互換性）
+const config = loadConfig();
+
+// 新しいアーキテクチャでサービスを初期化
+const novelRepository = new FileSystemNovelRepository(novelsDir);
+const indexerManager = new IndexerManager(config);
+const searchService = new IndexerSearchService(novelRepository, indexerManager);
+const fileOperationsService = new IndexerFileOperationsService(novelRepository, indexerManager);
+const service = new NovelService(novelRepository, searchService, fileOperationsService);
 
 const SAMPLE_NOVEL_ID = 'sample_novel';
 
@@ -76,10 +88,11 @@ describe('NovelService (read-only operations)', () => {
     ).rejects.toThrow('無効な正規表現');
   });
 
-  it('searchRag should throw error when IndexerManager is not set', async () => {
-    // configなしで作成されたサービスはIndexerManagerが設定されていない
-    await expect(service.searchRag(SAMPLE_NOVEL_ID, 'test query', 10)).rejects.toThrow(
-      'IndexerManager が設定されていません',
-    );
+  it('searchRag should return search results', async () => {
+    // リファクタリング後のアーキテクチャではRAG検索が正常に動作することをテスト
+    const results = await service.searchRag(SAMPLE_NOVEL_ID, 'キャラクター', 5);
+    expect(Array.isArray(results)).toBe(true);
+    // 実際にコンテンツが存在する場合、結果が返される可能性があります
+    // 結果がない場合でも空配列が返されることをテスト
   });
 });

@@ -118,23 +118,12 @@ export class ConsoleAppender implements LogAppender {
     const levelName = LogLevel[entry.level];
     const prefix = `[${entry.timestamp}] ${levelName}:`;
 
-    switch (entry.level) {
-      case LogLevel.ERROR:
-        if (entry.error) {
-          console.error(prefix, entry.message, entry.error, entry.meta);
-        } else {
-          console.error(prefix, entry.message, entry.meta);
-        }
-        break;
-      case LogLevel.WARN:
-        console.warn(prefix, entry.message, entry.meta);
-        break;
-      case LogLevel.INFO:
-        console.info(prefix, entry.message, entry.meta);
-        break;
-      case LogLevel.DEBUG:
-        console.debug(prefix, entry.message, entry.meta);
-        break;
+    // MCP サーバーでは全てのログをstderrに出力する必要がある
+    // stdoutはJSONメッセージ専用のため
+    if (entry.error) {
+      console.error(prefix, entry.message, entry.error, entry.meta);
+    } else {
+      console.error(prefix, entry.message, entry.meta);
     }
   }
 }
