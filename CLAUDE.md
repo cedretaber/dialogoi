@@ -7,6 +7,13 @@
 - ユーザとのコミュニケーションには日本語を利用してください
 - コード中のコメントやテストケース名も可能な限り日本語でお願いします
 
+## プロジェクト概要
+
+Dialogoi は小説執筆支援のための RAG 搭載 MCP（Model Context Protocol）サーバーです。FlexSearch ベースの形態素解析検索により、小説プロジェクトの検索とファイル管理ツールを提供します。
+
+**技術構成**: TypeScript + FlexSearch + kuromojin + MCP SDK  
+**詳細仕様**: `INSTRUCTION.md` を参照
+
 ## 開発コマンド
 
 ### 基本開発
@@ -24,75 +31,6 @@
 - `npm run format` - Prettier でコードをフォーマット
 - `npm run format:check` - コードフォーマットをチェック
 
-## アーキテクチャ概要
-
-Dialogoi は小説執筆支援のための RAG 搭載 MCP（Model Context Protocol）サーバーです。小説プロジェクトの検索とファイル管理ツールを提供します。
-
-### 主要コンポーネント
-
-1. **MCP サーバー** (`src/index.ts`) - 全ての MCP ツールを登録するメインサーバー
-2. **NovelService** (`src/services/novelService.ts`) - 小説操作のコアビジネスロジック
-3. **SearchBackend** (`src/backends/SearchBackend.ts`) - 検索機能の抽象インターフェース
-4. **設定管理** (`src/lib/config.ts`) - CLI 上書きサポート付き設定ローダー
-
-### プロジェクト構造パターン
-
-小説プロジェクトは以下の構造に従います：
-
-```
-novels/
-├── project_name/
-│   ├── novel.json          # プロジェクト設定
-│   ├── DIALOGOI.md        # AI ガイドライン（任意）
-│   ├── settings/           # キャラクター・世界観設定
-│   └── contents/           # 原稿ファイル
-```
-
-### 提供される MCP ツール
-
-- `list_novel_projects` - 利用可能な小説プロジェクト一覧
-- `list_novel_settings/content/instructions` - プレビュー付きファイル一覧
-- `get_novel_settings/content/instructions` - ファイル内容を取得
-- `search_novel_settings/content` - ファイル内検索
-- `add_novel_setting/content` - 新規ファイル作成（セキュリティチェック付き）
-
-### 設定システム
-
-設定の読み込み優先順位：
-
-1. CLI 引数（`--project-root`、`--max-tokens` など）
-2. `config/dialogoi.config.json`
-3. デフォルト値
-
-主要設定項目：
-
-- `projectRoot` - 小説プロジェクトのベースディレクトリ
-- `chunk.maxTokens` - チャンクあたりの最大トークン数（400）
-- `search.defaultK/maxK` - 検索結果の件数制限
-
-### 検索アーキテクチャ（フェーズ 1）
-
-FlexSearch 0.8.2 ベースの形態素解析検索を実装。kuromojinで日本語を解析し、単語単位でインデックスを構築。表層形・基本形・読みでの検索に対応し、品詞による重み付けスコアリングで高精度な検索を実現。抽象 SearchBackend インターフェースにより、将来のベクトル検索追加をサポート。
-
-### 主要技術仕様
-
-- **FlexSearch 0.8.2**: Document Search API、単語単位インデックス
-- **kuromojin 3.0.1**: 日本語形態素解析エンジン
-- **KeywordFlexBackend**: 形態素解析ベースの検索実装
-- **Chunkクラス**: getter方式でid/hash/baseIdを動的生成
-- **IndexerManager**: 複数プロジェクトのインデックスを管理
-- **遅延初期化**: 初回検索時にインデックス構築でメモリ効率化
-
-### セキュリティ機能
-
-ファイル作成 API には以下が含まれます：
-
-- パストラバーサル攻撃防止
-- ファイル拡張子制限（.md、.txt のみ）
-- プロジェクト設定ディレクトリへの制限
-- ファイルサイズ制限（10MB）
-- 上書き保護（明示的フラグが必要）
-
 ## 開発時の注意事項
 
 - 全てのファイル操作は絶対パスを使用
@@ -107,6 +45,12 @@ FlexSearch 0.8.2 ベースの形態素解析検索を実装。kuromojinで日本
 - テストのためにスクリプトを作成した場合、 git commit 前に削除すること
   - 機能が完成するまではテストスクリプトも削除せず残しておくこと
   - ユーザがテストを点検することができるように
+
+## 開発の進め方
+
+- 複数のフェーズに分かれている開発の場合は、フェーズが1つ終わるごとに必ず　lint, typecheck, test を行うこと
+- そのフェーズで作成したファイルにはテストを書くこと
+- lint, typecheck, test が通ったら git commit する
 
 ### コーディング規約と型安全性
 

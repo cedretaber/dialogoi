@@ -137,29 +137,76 @@ dialogoi/
 
 ---
 
-## 6 ワークフロー
+## 6 小説プロジェクト構造
 
-### 6.1 起動時
+小説プロジェクトは以下の構造に従います：
+
+```
+novels/
+├── project_name/
+│   ├── novel.json          # プロジェクト設定
+│   ├── DIALOGOI.md        # AI ガイドライン（任意）
+│   ├── settings/           # キャラクター・世界観設定
+│   └── contents/           # 原稿ファイル
+```
+
+### 6.1 設定システム
+
+設定の読み込み優先順位：
+
+1. CLI 引数（`--project-root`、`--max-tokens` など）
+2. `config/dialogoi.config.json`
+3. デフォルト値
+
+主要設定項目：
+
+- `projectRoot` - 小説プロジェクトのベースディレクトリ
+- `chunk.maxTokens` - チャンクあたりの最大トークン数（400）
+- `search.defaultK/maxK` - 検索結果の件数制限
+
+### 6.2 提供される MCP ツール
+
+- `list_novel_projects` - 利用可能な小説プロジェクト一覧
+- `list_novel_settings/content/instructions` - プレビュー付きファイル一覧
+- `get_novel_settings/content/instructions` - ファイル内容を取得
+- `search_novel_settings/content` - ファイル内検索
+- `add_novel_setting/content` - 新規ファイル作成（セキュリティチェック付き）
+
+### 6.3 セキュリティ機能
+
+ファイル作成 API には以下が含まれます：
+
+- パストラバーサル攻撃防止
+- ファイル拡張子制限（.md、.txt のみ）
+- プロジェクト設定ディレクトリへの制限
+- ファイルサイズ制限（10MB）
+- 上書き保護（明示的フラグが必要）
+
+---
+
+## 7 ワークフロー
+
+### 7.1 起動時
 
 1. `dialogoi.config.json` をロード（コマンドライン引数で上書き可能）。
 2. MCPサーバーとして起動、NovelServiceが小説プロジェクトを検出。
 3. IndexerManagerが各プロジェクトのインデックスを管理（遅延初期化）。
 
-### 6.2 インデックス構築（初回検索時）
+### 7.2 インデックス構築（初回検索時）
 
 1. 対象プロジェクトの **`*.md` / `*.txt`** を全走査。
 2. `MarkdownChunkingStrategy` でチャンク化（20%オーバーラップ）。
 3. `KeywordFlexBackend` で形態素解析 → 単語単位でインデックス。
 4. メモリ内に保持（高速検索を実現）。
 
-### 6.3 ライブ更新（実装予定）
+### 7.3 ライブ更新（実装予定）
 
 1. `watcher.ts` が FS イベントを受信。
 2. 差分計算 → 追加／削除チャンクを抽出。
 3. `removeByFile()` / `updateChunks()` でメモリ内インデックスを更新。
 4. デバウンスで変更を反映。
 
-### 6.4 検索フロー
+### 7.4 検索フロー
 
 ```
 MCPツール → NovelService.searchRag() → IndexerManager → KeywordFlexBackend
@@ -183,7 +230,7 @@ MCPツール → NovelService.searchRag() → IndexerManager → KeywordFlexBack
 
 ---
 
-## 7 実装チェックリスト
+## 8 実装チェックリスト
 
 ### フェーズ1完了項目 ✅
 
@@ -224,7 +271,7 @@ MCPツール → NovelService.searchRag() → IndexerManager → KeywordFlexBack
 
 ---
 
-## 8 設定例
+## 9 設定例
 
 ```json
 {
@@ -252,7 +299,7 @@ npm run dev -- --project-root ./my-novels --max-tokens 300
 
 ---
 
-## 9 パフォーマンス目標
+## 10 パフォーマンス目標
 
 | 指標                              | 目標値  |
 | --------------------------------- | ------- |
@@ -263,13 +310,13 @@ npm run dev -- --project-root ./my-novels --max-tokens 300
 
 ---
 
-## 10 フェーズ2フック ― HybridBackend スケルトン
+## 11 フェーズ2フック ― HybridBackend スケルトン
 
 `backends/HybridBackend.ts` を追加し `SearchBackend` を実装。Qdrant 未起動時は例外を投げ、呼び出し側で FlexBackend へフォールバックできるようにする。
 
 ---
 
-## 11 マイルストーン
+## 12 マイルストーン
 
 | 略号   | 期間 (目安) | 内容                                            |
 | ------ | ----------- | ----------------------------------------------- |
@@ -283,7 +330,7 @@ npm run dev -- --project-root ./my-novels --max-tokens 300
 
 ---
 
-## 12 Appendix ― コマンド
+## 13 Appendix ― コマンド
 
 ```bash
 # 開発モード (ts-node)
@@ -298,9 +345,9 @@ npm t
 
 ---
 
-## 13 リファクタリング計画（2025-01-15追加）
+## 14 リファクタリング計画（2025-01-15追加）
 
-### 13.1 現状の課題と改善方針
+### 14.1 現状の課題と改善方針
 
 #### 主要な問題点
 
@@ -319,13 +366,13 @@ npm t
    - 検索結果のキャッシュなし
    - 大規模データでの効率性問題
 
-### 13.2 リファクタリングフェーズ
+### 14.2 リファクタリングフェーズ
 
-#### Phase 1: 基盤整備（優先度：高）
+#### Phase 1: 基盤整備（優先度：高） ✅ **完了 (2025-01-15)**
 
 **目標**: 安定性とメンテナンス性の向上
 
-1. **統一エラーハンドリング**
+1. **統一エラーハンドリング** ✅ **完了**
 
    ```typescript
    // エラー階層の定義
@@ -335,7 +382,12 @@ npm t
    class SearchError extends DialogoiError {}
    ```
 
-2. **ロギングシステム導入**
+   **実装詳細:**
+   - `src/errors/DialogoiError.ts`: 完全なエラー階層実装
+   - `src/errors/ErrorHandler.ts`: 型安全なエラー変換ユーティリティ
+   - コンテキスト情報付きエラー、JSON serialization対応
+
+2. **ロギングシステム導入** ✅ **完了**
 
    ```typescript
    interface Logger {
@@ -345,16 +397,21 @@ npm t
    }
    ```
 
-3. **型安全性の改善**
-   - 危険な型アサーションの除去
-   - strictNullChecksの徹底
-   - unknown型の適切な使用
+   **実装詳細:**
+   - `src/logging/Logger.ts`: LogLevel対応、複数Appender対応
+   - ConsoleAppender、FileAppender（将来拡張用）
+   - LoggerFactory、グローバル管理、環境変数連携
 
-#### Phase 2: アーキテクチャ改善（優先度：高）
+3. **型安全性の改善** ✅ **完了**
+   - 危険な型アサーションの除去 ✅ `novelService.ts`で`null as unknown as IndexerManager`を除去
+   - strictNullChecksの徹底 ✅ Optional型活用
+   - unknown型の適切な使用 ✅ ErrorHandler実装
+
+#### Phase 2: アーキテクチャ改善（優先度：高） 🚧 **進行中**
 
 **目標**: 責任の分離と拡張性の向上
 
-1. **Repositoryパターンの導入**
+1. **Repositoryパターンの導入** 📋 **未着手**
 
    ```typescript
    interface NovelRepository {
@@ -365,7 +422,12 @@ npm t
    }
    ```
 
-2. **検索サービスの分離**
+   **実装予定:**
+   - `src/repositories/NovelRepository.ts`: インターフェース定義
+   - `src/repositories/FileSystemNovelRepository.ts`: ファイルシステム実装
+   - NovelServiceからデータアクセス層を分離
+
+2. **検索サービスの分離** 📋 **未着手**
 
    ```typescript
    interface SearchService {
@@ -373,7 +435,12 @@ npm t
    }
    ```
 
-3. **ファイル操作サービスの抽出**
+   **実装予定:**
+   - `src/services/SearchService.ts`: 検索ロジック分離
+   - NovelServiceから検索機能を独立
+
+3. **ファイル操作サービスの抽出** 📋 **未着手**
+
    ```typescript
    interface FileOperationsService {
      readFile(path: string): Promise<string>;
@@ -382,11 +449,15 @@ npm t
    }
    ```
 
-#### Phase 3: パフォーマンス最適化（優先度：中）
+   **実装予定:**
+   - `src/services/FileOperationsService.ts`: ファイルI/O抽象化
+   - セキュリティチェック機能の統合
+
+#### Phase 3: パフォーマンス最適化（優先度：中） 📋 **未着手**
 
 **目標**: スケーラビリティとレスポンス改善
 
-1. **プロジェクトスコープのIndexer管理**
+1. **プロジェクトスコープのIndexer管理** 📋 **未着手**
 
    ```typescript
    class IndexerFactory {
@@ -398,7 +469,11 @@ npm t
    }
    ```
 
-2. **キャッシュレイヤーの実装**
+   **実装予定:**
+   - IndexerManagerから個別プロジェクトIndexer管理を分離
+   - メモリ効率化とスケーラビリティ向上
+
+2. **キャッシュレイヤーの実装** 📋 **未着手**
 
    ```typescript
    interface CacheService {
@@ -408,15 +483,19 @@ npm t
    }
    ```
 
-3. **検索結果のストリーミング**
+   **実装予定:**
+   - 検索結果キャッシュ機能
+   - TTL対応、パターンマッチ無効化
+
+3. **検索結果のストリーミング** 📋 **未着手**
    - 大量結果のページネーション
    - AsyncIteratorによる逐次処理
 
-#### Phase 4: Qdrant統合準備（優先度：中）
+#### Phase 4: Qdrant統合準備（優先度：中） 📋 **未着手**
 
 **目標**: ベクトル検索への移行準備
 
-1. **埋め込みサービスインターフェース**
+1. **埋め込みサービスインターフェース** 📋 **未着手**
 
    ```typescript
    interface EmbeddingService {
@@ -425,7 +504,11 @@ npm t
    }
    ```
 
-2. **ハイブリッド検索戦略**
+   **実装予定:**
+   - ローカル/リモート埋め込みモデル対応
+   - バッチ処理による効率化
+
+2. **ハイブリッド検索戦略** 📋 **未着手**
 
    ```typescript
    interface SearchStrategy {
@@ -437,7 +520,13 @@ npm t
    class HybridSearchStrategy implements SearchStrategy {}
    ```
 
-3. **設定構造の拡張**
+   **実装予定:**
+   - 既存KeywordFlexBackendをStrategy化
+   - Qdrant連携のVectorStrategy
+   - スコア統合のHybridStrategy
+
+3. **設定構造の拡張** 📋 **未着手**
+
    ```typescript
    interface VectorConfig {
      enabled: boolean;
@@ -454,7 +543,23 @@ npm t
    }
    ```
 
-### 13.3 実装スケジュール
+   **実装予定:**
+   - DialogoiConfigにベクトル設定追加
+   - フォールバック機能（Qdrant利用不可時）
+
+### 14.3 進捗サマリー
+
+**全体進捗: 25% (Phase 1完了)**
+
+- ✅ **Phase 1 (基盤整備)**: 完了 (2025-01-15)
+  - 統一エラーハンドリング、ロギング、型安全性すべて実装済み
+  - テスト104個すべて通過、lint/typecheck問題なし
+- 🚧 **Phase 2 (アーキテクチャ改善)**: 進行中
+  - Repository、SearchService、FileOperationsService分離予定
+- 📋 **Phase 3 (パフォーマンス最適化)**: 未着手
+- 📋 **Phase 4 (Qdrant統合準備)**: 未着手
+
+### 14.4 実装スケジュール
 
 | フェーズ | 期間（目安） | 優先度 | 依存関係 |
 | -------- | ------------ | ------ | -------- |
@@ -463,7 +568,7 @@ npm t
 | Phase 3  | 1週間        | 中     | Phase 2  |
 | Phase 4  | 1週間        | 中     | Phase 2  |
 
-### 13.4 テスト戦略
+### 14.5 テスト戦略
 
 1. **単体テスト強化**
    - カバレッジ目標: 80%以上
@@ -480,7 +585,7 @@ npm t
    - メモリ使用量の監視
    - 検索レイテンシの測定
 
-### 13.5 移行戦略
+### 14.6 移行戦略
 
 1. **段階的移行**
    - 既存機能を維持しながら新構造を追加
@@ -492,7 +597,7 @@ npm t
    - 設定ファイルの互換性維持
    - 既存データの移行ツール提供
 
-### 13.6 既知の問題と対処
+### 14.7 既知の問題と対処
 
 1. **FlexSearch削除処理の制限**
    - 削除が即座に反映されない問題は既知
