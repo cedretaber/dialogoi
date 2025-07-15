@@ -2,6 +2,11 @@ import { Indexer } from '../indexer.js';
 import { DialogoiConfig } from './config.js';
 import { SearchResult } from '../backends/SearchBackend.js';
 import { FileWatcher, FileChangeEvent, createDefaultFileWatcherConfig } from './fileWatcher.js';
+import {
+  QdrantInitializationService,
+  QdrantInitializationResult,
+} from '../services/QdrantInitializationService.js';
+import { getLogger } from '../logging/index.js';
 
 /**
  * 単一のIndexerで複数の小説プロジェクトを管理するクラス
@@ -12,11 +17,46 @@ export class IndexerManager {
   private initializedNovels: Set<string> = new Set();
   private config: DialogoiConfig;
   private fileWatcher: FileWatcher | null = null;
+  private qdrantInitService: QdrantInitializationService;
+  private initializationResult: QdrantInitializationResult | null = null;
+  private logger = getLogger();
 
   constructor(config: DialogoiConfig) {
     this.config = config;
+    this.qdrantInitService = new QdrantInitializationService(config);
     // 単一のIndexerを作成
     this.indexer = new Indexer(this.config);
+  }
+
+  /**
+   * Qdrant 初期化を実行
+   */
+  async initializeQdrant(): Promise<QdrantInitializationResult> {
+    if (!this.initializationResult) {
+      this.logger.info('Qdrant 初期化を実行中...');
+      this.initializationResult = await this.qdrantInitService.initialize();
+
+      if (this.initializationResult.success) {
+        this.logger.info('Qdrant 初期化に成功しました', {
+          mode: this.initializationResult.mode,
+          containerId: this.initializationResult.containerId,
+        });
+      } else {
+        this.logger.warn('Qdrant 初期化に失敗しました。フォールバックモードで動作します', {
+          mode: this.initializationResult.mode,
+          error: this.initializationResult.error?.message,
+        });
+      }
+    }
+
+    return this.initializationResult;
+  }
+
+  /**
+   * Qdrant が利用可能かチェック
+   */
+  isQdrantAvailable(): boolean {
+    return this.initializationResult?.success ?? false;
   }
 
   /**
@@ -60,6 +100,19 @@ export class IndexerManager {
    * @returns 検索結果
    */
   async search(novelId: string, query: string, k: number): Promise<SearchResult[]> {
+    // Qdrant 初期化を確認
+    const initResult = await this.initializeQdrant();
+
+    if (!initResult.success) {
+      this.logger.warn('Qdrant が利用できません。空の結果を返します', {
+        novelId,
+        query,
+        mode: initResult.mode,
+        error: initResult.error?.message,
+      });
+      return [];
+    }
+
     await this.ensureNovelInitialized(novelId);
     return this.indexer.search(query, k, novelId);
   }
@@ -194,6 +247,7 @@ export class IndexerManager {
   async cleanup(): Promise<void> {
     await this.stopFileWatching();
     await this.indexer.cleanup();
+    await this.qdrantInitService.cleanup();
     this.initializedNovels.clear();
     console.error('🧹 全てのインデックスをクリーンアップしました');
   }

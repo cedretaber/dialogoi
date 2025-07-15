@@ -6,6 +6,14 @@ import { Indexer } from '../indexer.js';
 // Indexerをモック化
 vi.mock('../indexer.js');
 
+// QdrantInitializationServiceをモック化
+vi.mock('../services/QdrantInitializationService.js', () => ({
+  QdrantInitializationService: vi.fn().mockImplementation(() => ({
+    initialize: vi.fn().mockResolvedValue({ success: true, mode: 'explicit' }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 describe('IndexerManager', () => {
   let indexerManager: IndexerManager;
   let mockConfig: DialogoiConfig;
@@ -38,6 +46,12 @@ describe('IndexerManager', () => {
         url: 'http://localhost:6333',
         collection: 'test-collection',
         timeout: 5000,
+        docker: {
+          enabled: true,
+          image: 'qdrant/qdrant',
+          timeout: 30000,
+          autoCleanup: true,
+        },
       },
       vector: {
         collectionName: 'test-collection',

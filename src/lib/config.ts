@@ -19,6 +19,12 @@ export interface DialogoiConfig {
     apiKey?: string;
     collection: string;
     timeout: number;
+    docker: {
+      enabled: boolean;
+      image: string;
+      timeout: number;
+      autoCleanup: boolean;
+    };
   };
   vector: {
     collectionName: string;
@@ -49,6 +55,12 @@ const DEFAULT_CONFIG: DialogoiConfig = {
     url: 'http://localhost:6333',
     collection: 'dialogoi-chunks',
     timeout: 5000,
+    docker: {
+      enabled: true,
+      image: 'qdrant/qdrant',
+      timeout: 30000,
+      autoCleanup: true,
+    },
   },
   vector: {
     collectionName: 'dialogoi-chunks',

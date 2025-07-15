@@ -36,6 +36,12 @@ describe('Indexer', () => {
         url: 'http://localhost:6333',
         collection: 'test-collection',
         timeout: 5000,
+        docker: {
+          enabled: false,
+          image: 'qdrant/qdrant',
+          timeout: 30000,
+          autoCleanup: true,
+        },
       },
       vector: {
         collectionName: 'test-collection',
