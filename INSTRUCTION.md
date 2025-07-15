@@ -298,4 +298,204 @@ npm t
 
 ---
 
+## 13 リファクタリング計画（2025-01-15追加）
+
+### 13.1 現状の課題と改善方針
+
+#### 主要な問題点
+
+1. **アーキテクチャの課題**
+   - 単一Indexerで全小説を管理（スケーラビリティ問題）
+   - レイヤー間の密結合（NovelServiceが検索とファイルI/O両方を担当）
+   - 責任の混在（KeywordFlexBackendがファイル読み込みも実行）
+
+2. **コード品質の問題**
+   - 危険な型アサーション（`null as unknown as IndexerManager`）
+   - エラーハンドリングの不統一（throw/console.error/空配列返却の混在）
+   - コード重複（ファイル読み込みロジック、検索結果フォーマット等）
+
+3. **パフォーマンスの懸念**
+   - 全単語位置をメモリに保持
+   - 検索結果のキャッシュなし
+   - 大規模データでの効率性問題
+
+### 13.2 リファクタリングフェーズ
+
+#### Phase 1: 基盤整備（優先度：高）
+
+**目標**: 安定性とメンテナンス性の向上
+
+1. **統一エラーハンドリング**
+   ```typescript
+   // エラー階層の定義
+   class DialogoiError extends Error {}
+   class ProjectNotFoundError extends DialogoiError {}
+   class IndexingError extends DialogoiError {}
+   class SearchError extends DialogoiError {}
+   ```
+
+2. **ロギングシステム導入**
+   ```typescript
+   interface Logger {
+     debug(message: string, meta?: any): void
+     info(message: string, meta?: any): void
+     error(message: string, error?: Error, meta?: any): void
+   }
+   ```
+
+3. **型安全性の改善**
+   - 危険な型アサーションの除去
+   - strictNullChecksの徹底
+   - unknown型の適切な使用
+
+#### Phase 2: アーキテクチャ改善（優先度：高）
+
+**目標**: 責任の分離と拡張性の向上
+
+1. **Repositoryパターンの導入**
+   ```typescript
+   interface NovelRepository {
+     listProjects(): Promise<NovelProject[]>
+     getProject(id: string): Promise<NovelProject>
+     getSettings(projectId: string): Promise<NovelSettings>
+     getContent(projectId: string): Promise<NovelContent>
+   }
+   ```
+
+2. **検索サービスの分離**
+   ```typescript
+   interface SearchService {
+     search(projectId: string, query: string, options: SearchOptions): Promise<SearchResult[]>
+   }
+   ```
+
+3. **ファイル操作サービスの抽出**
+   ```typescript
+   interface FileOperationsService {
+     readFile(path: string): Promise<string>
+     writeFile(path: string, content: string): Promise<void>
+     listFiles(dir: string, extensions: string[]): Promise<string[]>
+   }
+   ```
+
+#### Phase 3: パフォーマンス最適化（優先度：中）
+
+**目標**: スケーラビリティとレスポンス改善
+
+1. **プロジェクトスコープのIndexer管理**
+   ```typescript
+   class IndexerFactory {
+     private indexers: Map<string, Indexer>
+     
+     getIndexer(projectId: string): Indexer {
+       // 遅延初期化、プロジェクト毎に独立したIndexer
+     }
+   }
+   ```
+
+2. **キャッシュレイヤーの実装**
+   ```typescript
+   interface CacheService {
+     get<T>(key: string): Promise<T | null>
+     set<T>(key: string, value: T, ttl?: number): Promise<void>
+     invalidate(pattern: string): Promise<void>
+   }
+   ```
+
+3. **検索結果のストリーミング**
+   - 大量結果のページネーション
+   - AsyncIteratorによる逐次処理
+
+#### Phase 4: Qdrant統合準備（優先度：中）
+
+**目標**: ベクトル検索への移行準備
+
+1. **埋め込みサービスインターフェース**
+   ```typescript
+   interface EmbeddingService {
+     embed(text: string): Promise<number[]>
+     embedBatch(texts: string[]): Promise<number[][]>
+   }
+   ```
+
+2. **ハイブリッド検索戦略**
+   ```typescript
+   interface SearchStrategy {
+     search(query: string, options: SearchOptions): Promise<SearchResult[]>
+   }
+   
+   class KeywordSearchStrategy implements SearchStrategy {}
+   class VectorSearchStrategy implements SearchStrategy {}
+   class HybridSearchStrategy implements SearchStrategy {}
+   ```
+
+3. **設定構造の拡張**
+   ```typescript
+   interface VectorConfig {
+     enabled: boolean
+     provider: 'qdrant' | 'none'
+     qdrant?: {
+       url: string
+       apiKey?: string
+       collection: string
+     }
+     embedding: {
+       model: string
+       dimensions: number
+     }
+   }
+   ```
+
+### 13.3 実装スケジュール
+
+| フェーズ | 期間（目安） | 優先度 | 依存関係 |
+|---------|-------------|--------|----------|
+| Phase 1 | 1週間 | 高 | なし |
+| Phase 2 | 2週間 | 高 | Phase 1 |
+| Phase 3 | 1週間 | 中 | Phase 2 |
+| Phase 4 | 1週間 | 中 | Phase 2 |
+
+### 13.4 テスト戦略
+
+1. **単体テスト強化**
+   - カバレッジ目標: 80%以上
+   - エラーケースのテスト追加
+   - モックの適切な使用
+
+2. **統合テスト追加**
+   - 検索フロー全体のテスト
+   - ファイル監視機能のテスト
+   - MCPツールのE2Eテスト
+
+3. **パフォーマンステスト**
+   - 大規模データでのベンチマーク
+   - メモリ使用量の監視
+   - 検索レイテンシの測定
+
+### 13.5 移行戦略
+
+1. **段階的移行**
+   - 既存機能を維持しながら新構造を追加
+   - フィーチャーフラグによる切り替え
+   - ロールバック可能な設計
+
+2. **後方互換性**
+   - MCP APIの変更なし
+   - 設定ファイルの互換性維持
+   - 既存データの移行ツール提供
+
+### 13.6 既知の問題と対処
+
+1. **FlexSearch削除処理の制限**
+   - 削除が即座に反映されない問題は既知
+   - 現在は削除→再追加で対処
+   - Qdrant移行で根本解決予定
+
+2. **テストコードのパス問題**
+   - KeywordFlexBackend.test.tsで絶対パス使用箇所あり
+   - 本番コードは正常（相対パス使用）
+   - Phase 1で修正予定
+
+---
+
 _フェーズ 1 インストラクションここまで_
