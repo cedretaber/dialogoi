@@ -4,11 +4,14 @@ import { NovelConfig, NovelProject } from '../domain/novel.js';
 import { fileExists, findFilesRecursively, ensureDirectory } from '../utils/fileUtils.js';
 import { IndexerManager } from '../lib/indexerManager.js';
 import { DialogoiConfig } from '../lib/config.js';
+import { ProjectNotFoundError, ConfigurationError } from '../errors/index.js';
+import { getLogger } from '../logging/index.js';
 
 export class NovelService {
   private readonly baseDir: string;
   private novelProjects: Map<string, NovelProject> = new Map();
-  private indexerManager: IndexerManager;
+  private indexerManager?: IndexerManager;
+  private readonly logger = getLogger();
 
   constructor(baseDir?: string, config?: DialogoiConfig) {
     this.baseDir = baseDir || path.join(process.cwd(), 'novels');
@@ -16,9 +19,9 @@ export class NovelService {
     // IndexerManagerを内部で初期化
     if (config) {
       this.indexerManager = new IndexerManager(config);
+      this.logger.debug('NovelService初期化完了', { baseDir: this.baseDir, hasConfig: true });
     } else {
-      // configが提供されない場合は後で設定
-      this.indexerManager = null as unknown as IndexerManager;
+      this.logger.debug('NovelService初期化完了（config未設定）', { baseDir: this.baseDir });
     }
   }
 
@@ -39,8 +42,12 @@ export class NovelService {
    */
   async searchRag(novelId: string, query: string, k: number) {
     if (!this.indexerManager) {
-      throw new Error('IndexerManager が設定されていません');
+      throw new ConfigurationError(
+        'IndexerManager が設定されていません',
+        'INDEXER_MANAGER_NOT_CONFIGURED',
+      );
     }
+    this.logger.debug('RAG検索実行', { novelId, query, k });
     return this.indexerManager.search(novelId, query, k);
   }
 
@@ -49,8 +56,12 @@ export class NovelService {
    */
   async startFileWatching(): Promise<void> {
     if (!this.indexerManager) {
-      throw new Error('IndexerManager が設定されていません');
+      throw new ConfigurationError(
+        'IndexerManager が設定されていません',
+        'INDEXER_MANAGER_NOT_CONFIGURED',
+      );
     }
+    this.logger.info('ファイル監視開始');
     await this.indexerManager.startFileWatching();
   }
 
@@ -59,8 +70,12 @@ export class NovelService {
    */
   async stopFileWatching(): Promise<void> {
     if (!this.indexerManager) {
-      throw new Error('IndexerManager が設定されていません');
+      throw new ConfigurationError(
+        'IndexerManager が設定されていません',
+        'INDEXER_MANAGER_NOT_CONFIGURED',
+      );
     }
+    this.logger.info('ファイル監視停止');
     await this.indexerManager.stopFileWatching();
   }
 
@@ -96,15 +111,22 @@ export class NovelService {
             };
 
             this.novelProjects.set(entry.name, project);
+            this.logger.debug('プロジェクト発見', { id: entry.name, path: novelPath });
           } catch (error) {
             // novel.json が無い、または読み込めないディレクトリはスキップ
+            this.logger.debug('プロジェクト設定読み込み失敗（スキップ）', {
+              id: entry.name,
+              error: error instanceof Error ? error.message : String(error),
+            });
             continue;
           }
         }
       }
     } catch (error) {
-      throw new Error(
-        `Failed to discover novel projects: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      throw new ConfigurationError(
+        `プロジェクト探索に失敗しました: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        'PROJECT_DISCOVERY_FAILED',
+        { baseDir: this.baseDir },
       );
     }
   }
@@ -544,7 +566,7 @@ export class NovelService {
 
     const project = this.novelProjects.get(novelId);
     if (!project) {
-      throw new Error(`Novel project '${novelId}' not found`);
+      throw new ProjectNotFoundError(novelId);
     }
 
     return project;

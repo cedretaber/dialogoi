@@ -326,6 +326,7 @@ npm t
 **目標**: 安定性とメンテナンス性の向上
 
 1. **統一エラーハンドリング**
+
    ```typescript
    // エラー階層の定義
    class DialogoiError extends Error {}
@@ -335,11 +336,12 @@ npm t
    ```
 
 2. **ロギングシステム導入**
+
    ```typescript
    interface Logger {
-     debug(message: string, meta?: any): void
-     info(message: string, meta?: any): void
-     error(message: string, error?: Error, meta?: any): void
+     debug(message: string, meta?: any): void;
+     info(message: string, meta?: any): void;
+     error(message: string, error?: Error, meta?: any): void;
    }
    ```
 
@@ -353,28 +355,30 @@ npm t
 **目標**: 責任の分離と拡張性の向上
 
 1. **Repositoryパターンの導入**
+
    ```typescript
    interface NovelRepository {
-     listProjects(): Promise<NovelProject[]>
-     getProject(id: string): Promise<NovelProject>
-     getSettings(projectId: string): Promise<NovelSettings>
-     getContent(projectId: string): Promise<NovelContent>
+     listProjects(): Promise<NovelProject[]>;
+     getProject(id: string): Promise<NovelProject>;
+     getSettings(projectId: string): Promise<NovelSettings>;
+     getContent(projectId: string): Promise<NovelContent>;
    }
    ```
 
 2. **検索サービスの分離**
+
    ```typescript
    interface SearchService {
-     search(projectId: string, query: string, options: SearchOptions): Promise<SearchResult[]>
+     search(projectId: string, query: string, options: SearchOptions): Promise<SearchResult[]>;
    }
    ```
 
 3. **ファイル操作サービスの抽出**
    ```typescript
    interface FileOperationsService {
-     readFile(path: string): Promise<string>
-     writeFile(path: string, content: string): Promise<void>
-     listFiles(dir: string, extensions: string[]): Promise<string[]>
+     readFile(path: string): Promise<string>;
+     writeFile(path: string, content: string): Promise<void>;
+     listFiles(dir: string, extensions: string[]): Promise<string[]>;
    }
    ```
 
@@ -383,10 +387,11 @@ npm t
 **目標**: スケーラビリティとレスポンス改善
 
 1. **プロジェクトスコープのIndexer管理**
+
    ```typescript
    class IndexerFactory {
-     private indexers: Map<string, Indexer>
-     
+     private indexers: Map<string, Indexer>;
+
      getIndexer(projectId: string): Indexer {
        // 遅延初期化、プロジェクト毎に独立したIndexer
      }
@@ -394,11 +399,12 @@ npm t
    ```
 
 2. **キャッシュレイヤーの実装**
+
    ```typescript
    interface CacheService {
-     get<T>(key: string): Promise<T | null>
-     set<T>(key: string, value: T, ttl?: number): Promise<void>
-     invalidate(pattern: string): Promise<void>
+     get<T>(key: string): Promise<T | null>;
+     set<T>(key: string, value: T, ttl?: number): Promise<void>;
+     invalidate(pattern: string): Promise<void>;
    }
    ```
 
@@ -411,19 +417,21 @@ npm t
 **目標**: ベクトル検索への移行準備
 
 1. **埋め込みサービスインターフェース**
+
    ```typescript
    interface EmbeddingService {
-     embed(text: string): Promise<number[]>
-     embedBatch(texts: string[]): Promise<number[][]>
+     embed(text: string): Promise<number[]>;
+     embedBatch(texts: string[]): Promise<number[][]>;
    }
    ```
 
 2. **ハイブリッド検索戦略**
+
    ```typescript
    interface SearchStrategy {
-     search(query: string, options: SearchOptions): Promise<SearchResult[]>
+     search(query: string, options: SearchOptions): Promise<SearchResult[]>;
    }
-   
+
    class KeywordSearchStrategy implements SearchStrategy {}
    class VectorSearchStrategy implements SearchStrategy {}
    class HybridSearchStrategy implements SearchStrategy {}
@@ -432,28 +440,28 @@ npm t
 3. **設定構造の拡張**
    ```typescript
    interface VectorConfig {
-     enabled: boolean
-     provider: 'qdrant' | 'none'
+     enabled: boolean;
+     provider: 'qdrant' | 'none';
      qdrant?: {
-       url: string
-       apiKey?: string
-       collection: string
-     }
+       url: string;
+       apiKey?: string;
+       collection: string;
+     };
      embedding: {
-       model: string
-       dimensions: number
-     }
+       model: string;
+       dimensions: number;
+     };
    }
    ```
 
 ### 13.3 実装スケジュール
 
 | フェーズ | 期間（目安） | 優先度 | 依存関係 |
-|---------|-------------|--------|----------|
-| Phase 1 | 1週間 | 高 | なし |
-| Phase 2 | 2週間 | 高 | Phase 1 |
-| Phase 3 | 1週間 | 中 | Phase 2 |
-| Phase 4 | 1週間 | 中 | Phase 2 |
+| -------- | ------------ | ------ | -------- |
+| Phase 1  | 1週間        | 高     | なし     |
+| Phase 2  | 2週間        | 高     | Phase 1  |
+| Phase 3  | 1週間        | 中     | Phase 2  |
+| Phase 4  | 1週間        | 中     | Phase 2  |
 
 ### 13.4 テスト戦略
 
