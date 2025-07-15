@@ -46,12 +46,16 @@ MCP API → NovelService → Repository/SearchService/FileOperationsService → 
 ```
 src/
 ├── services/
-│   ├── novelService.ts           # MCPツール実装・ファサード
-│   ├── SearchService.ts          # 検索サービス抽象化
-│   └── IndexerSearchService.ts   # 実装（IndexerManager連携）
+│   ├── novelService.ts                # MCPツール実装・ファサード
+│   ├── SearchService.ts               # 検索サービス抽象化
+│   ├── IndexerSearchService.ts        # 実装（IndexerManager連携）
+│   ├── EmbeddingService.ts            # Embedding抽象化
+│   └── TransformersEmbeddingService.ts # multilingual-e5-small実装
 ├── repositories/
-│   ├── NovelRepository.ts        # データアクセス抽象化
-│   └── FileSystemNovelRepository.ts # ファイルシステム実装
+│   ├── NovelRepository.ts             # データアクセス抽象化
+│   ├── FileSystemNovelRepository.ts   # ファイルシステム実装
+│   ├── VectorRepository.ts            # ベクトルDB抽象化
+│   └── QdrantVectorRepository.ts      # Qdrant実装
 ├── backends/
 │   ├── SearchBackend.ts          # 検索エンジン抽象化
 │   └── KeywordFlexBackend.ts     # FlexSearch実装
@@ -109,20 +113,33 @@ export class TransformersEmbeddingService implements EmbeddingService {
 }
 ```
 
-#### 4.2.2 Qdrant 接続・管理サービス
+#### 4.2.2 Qdrant ベクトルリポジトリ
 
-**`src/services/QdrantService.ts`**
+**`src/repositories/VectorRepository.ts`**
 
 ```typescript
-export class QdrantService {
-  async ensureCollection(collectionName: string, vectorSize: number): Promise<void>;
-  async upsertPoints(collectionName: string, points: PointStruct[]): Promise<void>;
-  async searchPoints(
+interface VectorRepository {
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  isConnected(): boolean;
+  ensureCollection(collectionName: string, vectorSize: number): Promise<void>;
+  upsertVectors(collectionName: string, vectors: VectorPoint[]): Promise<void>;
+  searchVectors(
     collectionName: string,
-    vector: number[],
+    queryVector: number[],
     limit: number,
-  ): Promise<ScoredPoint[]>;
-  async deletePoints(collectionName: string, pointIds: string[]): Promise<void>;
+    scoreThreshold?: number,
+  ): Promise<VectorSearchResult[]>;
+  deleteVectors(collectionName: string, pointIds: string[]): Promise<void>;
+}
+```
+
+**`src/repositories/QdrantVectorRepository.ts`**
+
+```typescript
+export class QdrantVectorRepository implements VectorRepository {
+  // Repository パターンに従った Qdrant 実装
+  // 将来的に Pinecone、Weaviate 等への切り替えに対応
 }
 ```
 
@@ -237,19 +254,20 @@ interface QdrantConfig {
 
 ### 4.5 実装フェーズ
 
-#### Phase 3-1: Embedding サービス実装（優先度：高）
+#### Phase 3-1: Embedding サービス実装（優先度：高）✅ **完了**
 
-- [ ] `EmbeddingService` インターフェースの定義
-- [ ] `TransformersEmbeddingService` の実装
-- [ ] multilingual-e5-small モデルの統合
-- [ ] バッチ処理機能の実装
+- [x] `EmbeddingService` インターフェースの定義
+- [x] `TransformersEmbeddingService` の実装
+- [x] multilingual-e5-small モデルの統合
+- [x] バッチ処理機能の実装
 
-#### Phase 3-2: Qdrant 統合（優先度：高）
+#### Phase 3-2: Qdrant 統合（優先度：高）✅ **完了**
 
-- [ ] `QdrantService` の実装
-- [ ] 接続管理とエラーハンドリング
-- [ ] コレクション管理機能
-- [ ] CRUD 操作の実装
+- [x] `VectorRepository` インターフェースの定義
+- [x] `QdrantVectorRepository` の実装（Repository パターン）
+- [x] 接続管理とエラーハンドリング
+- [x] コレクション管理機能
+- [x] CRUD 操作の実装
 
 #### Phase 3-3: ベクトル検索バックエンド（優先度：高）
 
