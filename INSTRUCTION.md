@@ -15,6 +15,7 @@ Dialogoi は小説執筆支援のための RAG 搭載 MCP（Model Context Protoc
 - Qdrant（ベクトル検索）
 - @huggingface/transformers（multilingual-e5-small）
 - MCP SDK
+- chokidar（ファイル監視）
 
 **目標**:
 
@@ -58,7 +59,6 @@ src/
 │   └── QdrantVectorRepository.ts      # Qdrant実装
 ├── backends/
 │   ├── SearchBackend.ts          # 検索エンジン抽象化
-│   ├── KeywordFlexBackend.ts     # FlexSearch実装（削除予定）
 │   └── VectorBackend.ts          # ベクトル検索実装
 ├── lib/
 │   ├── indexerManager.ts         # インデックス管理
@@ -246,15 +246,15 @@ interface QdrantConfig {
 - [x] ベクトル検索機能
 - [x] テストの作成と実行
 
-#### Phase 3-4: FlexSearch廃止とアーキテクチャ簡素化（優先度：高）
+#### Phase 3-4: FlexSearch廃止とアーキテクチャ簡素化（優先度：高）✅ **完了**
 
-- [ ] FlexSearch 関連コードの削除
-- [ ] `KeywordFlexBackend` の削除
-- [ ] kuromojin 関連コードの削除
-- [ ] `IndexerManager` をベクトル検索対応に更新
-- [ ] `search_rag` ツールを `VectorBackend` 使用に更新
-- [ ] 不要な依存関係を package.json から削除
-- [ ] テストの更新と実行
+- [x] FlexSearch 関連コードの削除
+- [x] `KeywordFlexBackend` の削除
+- [x] kuromojin 関連コードの削除
+- [x] `IndexerManager` をベクトル検索対応に更新
+- [x] `search_rag` ツールを `VectorBackend` 使用に更新
+- [x] 不要な依存関係を package.json から削除
+- [x] テストの更新と実行
 
 #### Phase 3-5: 設定と初期化戦略（優先度：中）
 
@@ -277,9 +277,8 @@ interface QdrantConfig {
 
 **削除対象ライブラリ:**
 
-- flexsearch
-- kuromojin
-- @types/kuromojin
+- flexsearch（削除済み）
+- kuromojin（削除済み）
 
 #### 3-4.2 IndexerManager の更新
 
@@ -351,7 +350,7 @@ novels/
 
 **開始日**: 2025-01-15
 **Phase 3-3 完了日**: 2025-01-15
-**Phase 3-4 開始日**: 2025-01-15
+**Phase 3-4 完了日**: 2025-01-15
 **目標完了日**: 2025-01-18
 
 **進捗追跡**: 各フェーズ完了時に INSTRUCTION.md を更新
