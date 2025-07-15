@@ -23,14 +23,27 @@ describe('IndexerManager', () => {
     vi.clearAllMocks();
 
     mockConfig = {
-      vector: 'none',
       projectRoot: '/test/novels',
       chunk: {
         maxTokens: 400,
         overlap: 0.2,
       },
-      flex: {
-        profile: 'match',
+      embedding: {
+        enabled: true,
+        model: 'intfloat/multilingual-e5-small',
+        dimensions: 384,
+        batchSize: 32,
+      },
+      qdrant: {
+        url: 'http://localhost:6333',
+        collection: 'test-collection',
+        timeout: 5000,
+      },
+      vector: {
+        collectionName: 'test-collection',
+        scoreThreshold: 0.7,
+        vectorDimensions: 384,
+        snippetLength: 120,
       },
       search: {
         defaultK: 10,

@@ -1,9 +1,5 @@
-import {
-  SearchService,
-  SearchOptions,
-  SearchResult,
-  KeywordSearchResult,
-} from './SearchService.js';
+import { SearchService, SearchOptions, KeywordSearchResult } from './SearchService.js';
+import { SearchResult } from '../backends/SearchBackend.js';
 import { NovelRepository } from '../repositories/NovelRepository.js';
 import { IndexerManager } from '../lib/indexerManager.js';
 import { ConfigurationError } from '../errors/index.js';

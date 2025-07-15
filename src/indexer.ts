@@ -1,18 +1,19 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { KeywordFlexBackend } from './backends/KeywordFlexBackend.js';
-import type { Preset } from 'flexsearch';
+import { VectorBackend } from './backends/VectorBackend.js';
 import { Chunk } from './backends/SearchBackend.js';
 import { MarkdownChunkingStrategy } from './lib/chunker.js';
 import { DialogoiConfig } from './lib/config.js';
 import { findFilesRecursively } from './utils/fileUtils.js';
+import { TransformersEmbeddingService } from './services/TransformersEmbeddingService.js';
+import { QdrantVectorRepository } from './repositories/QdrantVectorRepository.js';
 
 /**
  * インデックス管理クラス
  * ファイルシステムの監視、チャンク化、インデックス管理を担当
  */
 export class Indexer {
-  private backend: KeywordFlexBackend;
+  private backend: VectorBackend;
   private chunkingStrategy: MarkdownChunkingStrategy;
   private config: DialogoiConfig;
   private projectRoot: string;
@@ -21,11 +22,13 @@ export class Indexer {
     this.config = config;
     this.projectRoot = path.resolve(config.projectRoot);
 
-    // KeywordFlexBackend の初期化
-    this.backend = new KeywordFlexBackend({
-      profile: config.flex.profile as Preset,
-      baseDirectory: this.projectRoot,
+    // VectorBackend の初期化
+    const embeddingService = new TransformersEmbeddingService(config.embedding);
+    const vectorRepository = new QdrantVectorRepository({
+      ...config.qdrant,
+      defaultCollection: config.qdrant.collection,
     });
+    this.backend = new VectorBackend(vectorRepository, embeddingService, config.vector);
 
     // チャンク化戦略の初期化
     this.chunkingStrategy = new MarkdownChunkingStrategy();
@@ -37,6 +40,9 @@ export class Indexer {
   async indexNovel(novelId: string): Promise<void> {
     const startTime = Date.now();
     console.error(`🔍 小説プロジェクト "${novelId}" のファイルを走査中...`);
+
+    // VectorBackend を初期化
+    await this.backend.initialize();
 
     // ターゲットファイルを検索（*.md, *.txt）
     const files = await this.findTargetFiles(novelId);
@@ -124,6 +130,9 @@ export class Indexer {
    */
   async updateFile(filePath: string, novelId: string): Promise<void> {
     try {
+      // VectorBackend を初期化
+      await this.backend.initialize();
+
       // 相対パスに変換して削除
       const relativePath = path.relative(this.projectRoot, filePath);
       await this.removeFileChunks(relativePath);
@@ -164,6 +173,8 @@ export class Indexer {
    * 検索機能をバックエンドに委譲
    */
   async search(query: string, k: number = this.config.search.defaultK, novelId: string) {
+    // VectorBackend を初期化
+    await this.backend.initialize();
     return this.backend.search(query, k, novelId);
   }
 
@@ -178,6 +189,8 @@ export class Indexer {
    * 特定の小説プロジェクトのデータをインデックスから削除
    */
   async removeNovelFromIndex(novelId: string): Promise<void> {
+    // VectorBackend を初期化
+    await this.backend.initialize();
     await this.backend.removeByNovel(novelId);
     console.error(`🗑️ 小説プロジェクト "${novelId}" のインデックスを削除しました`);
   }

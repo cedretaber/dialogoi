@@ -389,6 +389,21 @@ export class VectorBackend extends SearchBackend {
     // クエリに関連する部分が見つからない場合は先頭から
     return content.substring(0, maxLength) + (content.length > maxLength ? '...' : '');
   }
+
+  /**
+   * バックエンドが準備完了かどうかを確認
+   */
+  isReady(): boolean {
+    return this.vectorRepository.isConnected() && this.embeddingService.isReady();
+  }
+
+  /**
+   * リソースのクリーンアップ
+   */
+  async dispose(): Promise<void> {
+    await this.vectorRepository.disconnect();
+    await this.embeddingService.dispose();
+  }
 }
 
 /**

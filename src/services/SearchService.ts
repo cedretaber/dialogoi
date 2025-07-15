@@ -1,3 +1,5 @@
+import { SearchResult } from '../backends/SearchBackend.js';
+
 /**
  * 検索オプション
  */
@@ -6,21 +8,6 @@ export interface SearchOptions {
   k?: number;
   /** 正規表現を使用するか */
   useRegex?: boolean;
-}
-
-/**
- * 検索結果
- */
-export interface SearchResult {
-  id: string;
-  score: number;
-  snippet: string;
-  payload: {
-    file: string;
-    start: number;
-    end: number;
-    tags?: string[];
-  };
 }
 
 /**

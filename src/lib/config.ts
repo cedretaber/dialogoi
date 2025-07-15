@@ -3,14 +3,28 @@ import * as path from 'path';
 
 // 設定の型定義
 export interface DialogoiConfig {
-  vector: 'none' | 'hybrid';
   projectRoot: string;
   chunk: {
     maxTokens: number;
     overlap: number;
   };
-  flex: {
-    profile: 'fast' | 'match' | 'score' | 'default';
+  embedding: {
+    enabled: boolean;
+    model: string;
+    dimensions: number;
+    batchSize: number;
+  };
+  qdrant: {
+    url: string;
+    apiKey?: string;
+    collection: string;
+    timeout: number;
+  };
+  vector: {
+    collectionName: string;
+    scoreThreshold: number;
+    vectorDimensions: number;
+    snippetLength: number;
   };
   search: {
     defaultK: number;
@@ -20,14 +34,27 @@ export interface DialogoiConfig {
 
 // デフォルト設定
 const DEFAULT_CONFIG: DialogoiConfig = {
-  vector: 'none',
   projectRoot: './novels',
   chunk: {
     maxTokens: 400,
     overlap: 0.2,
   },
-  flex: {
-    profile: 'fast',
+  embedding: {
+    enabled: true,
+    model: 'intfloat/multilingual-e5-small',
+    dimensions: 384,
+    batchSize: 32,
+  },
+  qdrant: {
+    url: 'http://localhost:6333',
+    collection: 'dialogoi-chunks',
+    timeout: 5000,
+  },
+  vector: {
+    collectionName: 'dialogoi-chunks',
+    scoreThreshold: 0.7,
+    vectorDimensions: 384,
+    snippetLength: 120,
   },
   search: {
     defaultK: 10,
@@ -68,20 +95,6 @@ function getCommandLineOverrides(): Partial<DialogoiConfig> {
         if (nextArg && !nextArg.startsWith('--')) {
           if (!overrides.chunk) overrides.chunk = {};
           overrides.chunk.overlap = parseFloat(nextArg);
-          i++;
-        }
-        break;
-      case '--flex-profile':
-        if (nextArg && !nextArg.startsWith('--')) {
-          if (!overrides.flex) overrides.flex = {};
-          overrides.flex.profile = nextArg as DialogoiConfig['flex']['profile'];
-          i++;
-        }
-        break;
-      case '--export-path':
-        if (nextArg && !nextArg.startsWith('--')) {
-          if (!overrides.flex) overrides.flex = {};
-          overrides.flex.exportPath = nextArg;
           i++;
         }
         break;

@@ -8,7 +8,9 @@ import { findFilesRecursively } from './utils/fileUtils.js';
 // モックの設定
 vi.mock('fs/promises');
 vi.mock('./utils/fileUtils.js');
-vi.mock('./backends/KeywordFlexBackend.js');
+vi.mock('./backends/VectorBackend.js');
+vi.mock('./services/TransformersEmbeddingService.js');
+vi.mock('./repositories/QdrantVectorRepository.js');
 
 describe('Indexer', () => {
   let indexer: Indexer;
@@ -19,14 +21,27 @@ describe('Indexer', () => {
     vi.clearAllMocks();
 
     mockConfig = {
-      vector: 'none',
       projectRoot: testProjectRoot,
       chunk: {
         maxTokens: 400,
         overlap: 50,
       },
-      flex: {
-        profile: 'match',
+      embedding: {
+        enabled: true,
+        model: 'intfloat/multilingual-e5-small',
+        dimensions: 384,
+        batchSize: 32,
+      },
+      qdrant: {
+        url: 'http://localhost:6333',
+        collection: 'test-collection',
+        timeout: 5000,
+      },
+      vector: {
+        collectionName: 'test-collection',
+        scoreThreshold: 0.7,
+        vectorDimensions: 384,
+        snippetLength: 120,
       },
       search: {
         defaultK: 10,

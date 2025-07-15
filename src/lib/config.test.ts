@@ -29,15 +29,27 @@ describe('Config Loader', () => {
   it('should load config from JSON file', () => {
     const mockConfig = JSON.stringify(
       {
-        vector: 'none',
         projectRoot: './test-novels',
         chunk: {
           maxTokens: 300,
           overlap: 0.15,
         },
-        flex: {
-          profile: 'match',
-          exportPath: './test-cache/index.json',
+        embedding: {
+          enabled: true,
+          model: 'intfloat/multilingual-e5-small',
+          dimensions: 384,
+          batchSize: 32,
+        },
+        qdrant: {
+          url: 'http://localhost:6333',
+          collection: 'dialogoi-chunks',
+          timeout: 5000,
+        },
+        vector: {
+          collectionName: 'dialogoi-chunks',
+          scoreThreshold: 0.7,
+          vectorDimensions: 384,
+          snippetLength: 120,
         },
         search: {
           defaultK: 5,
@@ -53,15 +65,27 @@ describe('Config Loader', () => {
     const config = loadConfig();
 
     expect(config).toEqual({
-      vector: 'none',
       projectRoot: './test-novels',
       chunk: {
         maxTokens: 300,
         overlap: 0.15,
       },
-      flex: {
-        profile: 'match',
-        exportPath: './test-cache/index.json',
+      embedding: {
+        enabled: true,
+        model: 'intfloat/multilingual-e5-small',
+        dimensions: 384,
+        batchSize: 32,
+      },
+      qdrant: {
+        url: 'http://localhost:6333',
+        collection: 'dialogoi-chunks',
+        timeout: 5000,
+      },
+      vector: {
+        collectionName: 'dialogoi-chunks',
+        scoreThreshold: 0.7,
+        vectorDimensions: 384,
+        snippetLength: 120,
       },
       search: {
         defaultK: 5,
@@ -78,14 +102,27 @@ describe('Config Loader', () => {
     const config = loadConfig();
 
     expect(config).toEqual({
-      vector: 'none',
       projectRoot: './novels',
       chunk: {
         maxTokens: 400,
         overlap: 0.2,
       },
-      flex: {
-        profile: 'fast',
+      embedding: {
+        enabled: true,
+        model: 'intfloat/multilingual-e5-small',
+        dimensions: 384,
+        batchSize: 32,
+      },
+      qdrant: {
+        url: 'http://localhost:6333',
+        collection: 'dialogoi-chunks',
+        timeout: 5000,
+      },
+      vector: {
+        collectionName: 'dialogoi-chunks',
+        scoreThreshold: 0.7,
+        vectorDimensions: 384,
+        snippetLength: 120,
       },
       search: {
         defaultK: 10,
@@ -96,7 +133,6 @@ describe('Config Loader', () => {
 
   it('should merge partial config with defaults', () => {
     const mockConfig = JSON.stringify({
-      vector: 'hybrid',
       chunk: {
         maxTokens: 500,
       },
@@ -106,10 +142,10 @@ describe('Config Loader', () => {
 
     const config = loadConfig();
 
-    expect(config.vector).toBe('hybrid');
+    expect(config.vector.collectionName).toBe('dialogoi-chunks');
     expect(config.chunk.maxTokens).toBe(500);
     expect(config.chunk.overlap).toBe(0.2); // デフォルト値
-    expect(config.flex.profile).toBe('fast'); // デフォルト値
+    expect(config.embedding.enabled).toBe(true); // デフォルト値
   });
 
   it('should override config with command line arguments', () => {

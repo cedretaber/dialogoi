@@ -28,8 +28,6 @@
     "@qdrant/js-client-rest": "^1.14.1",
     "chokidar": "^4.0.3",
     "dotenv": "^16.4.5",
-    "flexsearch": "^0.8.2",
-    "kuromojin": "^3.0.1",
     "zod": "^3.25.67"
   },
   "devDependencies": {
