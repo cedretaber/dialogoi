@@ -9,6 +9,7 @@ import { IndexerFileOperationsService } from './services/IndexerFileOperationsSe
 import { IndexerManager } from './lib/indexerManager.js';
 import path from 'path';
 import { loadConfig } from './lib/config.js';
+import { MarkdownFormatterService } from './services/MarkdownFormatterService.js';
 
 dotenv.config();
 
@@ -81,9 +82,11 @@ server.registerTool(
   async (params: { novelId: string }) => {
     try {
       const settingsList = await novelService.listNovelSettings(params.novelId);
-      const result = settingsList
-        .map((item) => `ファイル名: ${item.filename}\nプレビュー:\n${item.preview}\n---`)
-        .join('\n\n');
+      const result = MarkdownFormatterService.formatFileList(
+        '設定ファイル一覧',
+        params.novelId,
+        settingsList,
+      );
 
       return {
         content: [{ type: 'text' as const, text: result }],
@@ -112,24 +115,33 @@ server.registerTool(
         params.useRegex || false,
       );
 
+      const searchType = MarkdownFormatterService.getSearchType(params.useRegex);
+
       if (searchResults.length === 0) {
-        const searchType = params.useRegex ? '正規表現' : 'キーワード';
+        const emptyMessage = MarkdownFormatterService.generateEmptySearchMessage(
+          searchType,
+          params.keyword,
+          '設定ファイル',
+        );
+        const result = MarkdownFormatterService.formatEmptySearchResults(
+          '設定ファイル検索結果',
+          params.novelId,
+          params.keyword,
+          searchType,
+          emptyMessage,
+        );
         return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `${searchType}「${params.keyword}」に一致する設定ファイルが見つかりませんでした。`,
-            },
-          ],
+          content: [{ type: 'text' as const, text: result }],
         };
       }
 
-      const result = searchResults
-        .map(
-          (item) =>
-            `ファイル名: ${item.filename}\n該当箇所:\n${item.matchingLines.join('\n\n')}\n---`,
-        )
-        .join('\n\n');
+      const result = MarkdownFormatterService.formatSearchResults(
+        '設定ファイル検索結果',
+        params.novelId,
+        params.keyword,
+        searchType,
+        searchResults,
+      );
 
       return {
         content: [{ type: 'text' as const, text: result }],
@@ -181,24 +193,33 @@ server.registerTool(
         params.useRegex || false,
       );
 
+      const searchType = MarkdownFormatterService.getSearchType(params.useRegex);
+
       if (searchResults.length === 0) {
-        const searchType = params.useRegex ? '正規表現' : 'キーワード';
+        const emptyMessage = MarkdownFormatterService.generateEmptySearchMessage(
+          searchType,
+          params.keyword,
+          '本文ファイル',
+        );
+        const result = MarkdownFormatterService.formatEmptySearchResults(
+          '本文ファイル検索結果',
+          params.novelId,
+          params.keyword,
+          searchType,
+          emptyMessage,
+        );
         return {
-          content: [
-            {
-              type: 'text' as const,
-              text: `${searchType}「${params.keyword}」に一致する本文ファイルが見つかりませんでした。`,
-            },
-          ],
+          content: [{ type: 'text' as const, text: result }],
         };
       }
 
-      const result = searchResults
-        .map(
-          (item) =>
-            `ファイル名: ${item.filename}\n該当箇所:\n${item.matchingLines.join('\n\n')}\n---`,
-        )
-        .join('\n\n');
+      const result = MarkdownFormatterService.formatSearchResults(
+        '本文ファイル検索結果',
+        params.novelId,
+        params.keyword,
+        searchType,
+        searchResults,
+      );
 
       return {
         content: [{ type: 'text' as const, text: result }],
@@ -266,12 +287,7 @@ server.registerTool(
   async () => {
     try {
       const projects = await novelService.listNovelProjects();
-      const result = projects
-        .map(
-          (project) =>
-            `ID: ${project.id}\nタイトル: ${project.title}${project.description ? `\n概要: ${project.description}` : ''}\n---`,
-        )
-        .join('\n\n');
+      const result = MarkdownFormatterService.formatProjectList(projects);
 
       return {
         content: [{ type: 'text' as const, text: result }],
@@ -295,9 +311,11 @@ server.registerTool(
   async (params: { novelId: string }) => {
     try {
       const contentList = await novelService.listNovelContent(params.novelId);
-      const result = contentList
-        .map((item) => `ファイル名: ${item.filename}\nプレビュー:\n${item.preview}\n---`)
-        .join('\n\n');
+      const result = MarkdownFormatterService.formatFileList(
+        '本文ファイル一覧',
+        params.novelId,
+        contentList,
+      );
 
       return {
         content: [{ type: 'text' as const, text: result }],
@@ -426,13 +444,20 @@ server.registerTool(
     try {
       const list = await novelService.listNovelInstructions(params.novelId);
       if (list.length === 0) {
+        const result = MarkdownFormatterService.formatEmptyFileList(
+          '指示ファイル一覧',
+          params.novelId,
+          '指示ファイルが見つかりませんでした。',
+        );
         return {
-          content: [{ type: 'text' as const, text: '指示ファイルが見つかりませんでした。' }],
+          content: [{ type: 'text' as const, text: result }],
         };
       }
-      const result = list
-        .map((item) => `ファイル名: ${item.filename}\nプレビュー:\n${item.preview}\n---`)
-        .join('\n\n');
+      const result = MarkdownFormatterService.formatFileList(
+        '指示ファイル一覧',
+        params.novelId,
+        list,
+      );
       return { content: [{ type: 'text' as const, text: result }] };
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
