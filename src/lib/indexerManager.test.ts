@@ -120,10 +120,10 @@ describe('IndexerManager', () => {
     it('既に初期化済みの小説に対してファイル更新を実行できる', async () => {
       // 先に初期化を実行
       await indexerManager.updateFile('novel-1', 'initial.md');
-      
+
       // モックをリセット
       vi.clearAllMocks();
-      
+
       // 既に初期化済みの小説に対してファイル更新を実行
       await indexerManager.updateFile('novel-1', 'test.md');
 
