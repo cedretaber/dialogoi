@@ -20,7 +20,9 @@
     "ci": "rm -rf node_modules package-lock.json && npm install"
   },
   "dependencies": {
+    "@huggingface/transformers": "^3.6.3",
     "@modelcontextprotocol/sdk": "^1.12.3",
+    "@qdrant/js-client-rest": "^1.14.1",
     "chokidar": "^4.0.3",
     "dotenv": "^16.4.5",
     "flexsearch": "^0.8.2",
