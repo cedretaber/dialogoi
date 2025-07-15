@@ -1,24 +1,33 @@
 import { QdrantClient, type Schemas } from '@qdrant/js-client-rest';
 import { getLogger } from '../logging/index.js';
 import { DialogoiError } from '../errors/index.js';
+import type {
+  VectorRepository,
+  VectorPoint,
+  VectorSearchResult,
+  CollectionInfo,
+  VectorRepositoryConfig,
+} from './VectorRepository.js';
+
+export type { VectorRepositoryConfig };
 
 const logger = getLogger();
 
 /**
- * Qdrantベクトルデータベースサービス
- * チャンクのベクトル化とベクトル検索機能を提供
+ * Qdrantベクトルデータベースリポジトリ
+ * VectorRepositoryインターフェースの実装としてQdrantを使用
  */
-export class QdrantService {
+export class QdrantVectorRepository implements VectorRepository {
   private client: QdrantClient;
-  private isConnected: boolean = false;
+  private connectionState: boolean = false;
 
-  constructor(private readonly config: QdrantConfig) {
+  constructor(private readonly config: VectorRepositoryConfig) {
     this.client = new QdrantClient({
       url: config.url,
       apiKey: config.apiKey,
     });
 
-    logger.info('QdrantService initialized', {
+    logger.info('QdrantVectorRepository initialized', {
       url: config.url,
       hasApiKey: !!config.apiKey,
       timeout: config.timeout,
@@ -29,7 +38,7 @@ export class QdrantService {
    * Qdrantサーバーへの接続を確認
    */
   async connect(): Promise<void> {
-    if (this.isConnected) {
+    if (this.connectionState) {
       return;
     }
 
@@ -40,7 +49,7 @@ export class QdrantService {
       // ヘルスチェック
       await this.client.versionInfo();
 
-      this.isConnected = true;
+      this.connectionState = true;
       const connectTime = Date.now() - startTime;
       logger.info(`Connected to Qdrant successfully in ${connectTime}ms`);
     } catch (error) {
@@ -50,6 +59,24 @@ export class QdrantService {
         error as Error,
       );
     }
+  }
+
+  /**
+   * 接続を閉じる
+   */
+  async disconnect(): Promise<void> {
+    if (this.connectionState) {
+      // QdrantClientには明示的なdisconnectメソッドがないため、フラグのみリセット
+      this.connectionState = false;
+      logger.info('Disconnected from Qdrant');
+    }
+  }
+
+  /**
+   * 接続状態を確認
+   */
+  isConnected(): boolean {
+    return this.connectionState;
   }
 
   /**
@@ -88,19 +115,26 @@ export class QdrantService {
   }
 
   /**
-   * ポイントの一括挿入・更新
+   * ベクトルポイントの一括挿入・更新
    */
-  async upsertPoints(collectionName: string, points: Schemas['PointStruct'][]): Promise<void> {
+  async upsertVectors(collectionName: string, vectors: VectorPoint[]): Promise<void> {
     await this.connect();
 
-    if (points.length === 0) {
-      logger.debug('No points to upsert');
+    if (vectors.length === 0) {
+      logger.debug('No vectors to upsert');
       return;
     }
 
     try {
-      logger.debug(`Upserting ${points.length} points to collection: ${collectionName}`);
+      logger.debug(`Upserting ${vectors.length} vectors to collection: ${collectionName}`);
       const startTime = Date.now();
+
+      // VectorPointをQdrantのPointStruct形式に変換
+      const points: Schemas['PointStruct'][] = vectors.map((vector) => ({
+        id: vector.id,
+        vector: vector.vector,
+        payload: vector.payload,
+      }));
 
       await this.client.upsert(collectionName, {
         wait: true, // 操作の完了を待つ
@@ -108,16 +142,16 @@ export class QdrantService {
       });
 
       const upsertTime = Date.now() - startTime;
-      logger.info(`Upserted ${points.length} points in ${upsertTime}ms`, {
+      logger.info(`Upserted ${vectors.length} vectors in ${upsertTime}ms`, {
         collection: collectionName,
-        pointCount: points.length,
+        vectorCount: vectors.length,
       });
     } catch (error) {
-      logger.error(`Failed to upsert points to collection: ${collectionName}`, error as Error);
+      logger.error(`Failed to upsert vectors to collection: ${collectionName}`, error as Error);
       throw new QdrantUpsertError(
-        `Failed to upsert ${points.length} points to ${collectionName}: ${(error as Error).message}`,
+        `Failed to upsert ${vectors.length} vectors to ${collectionName}: ${(error as Error).message}`,
         collectionName,
-        points.length,
+        vectors.length,
         error as Error,
       );
     }
@@ -126,12 +160,12 @@ export class QdrantService {
   /**
    * ベクトル検索
    */
-  async searchPoints(
+  async searchVectors(
     collectionName: string,
-    vector: number[],
+    queryVector: number[],
     limit: number,
     scoreThreshold?: number,
-  ): Promise<Schemas['ScoredPoint'][]> {
+  ): Promise<VectorSearchResult[]> {
     await this.connect();
 
     try {
@@ -139,7 +173,7 @@ export class QdrantService {
       const startTime = Date.now();
 
       const searchResult = await this.client.search(collectionName, {
-        vector,
+        vector: queryVector,
         limit,
         score_threshold: scoreThreshold,
         with_payload: true, // メタデータも取得
@@ -153,7 +187,16 @@ export class QdrantService {
         scoreThreshold,
       });
 
-      return searchResult;
+      // QdrantのScoredPointをVectorSearchResultに変換
+      return searchResult.map((point) => ({
+        id: point.id.toString(),
+        score: point.score,
+        payload: point.payload || undefined,
+        vector:
+          Array.isArray(point.vector) && point.vector.every((v) => typeof v === 'number')
+            ? point.vector
+            : undefined,
+      }));
     } catch (error) {
       logger.error(`Failed to search in collection: ${collectionName}`, error as Error);
       throw new QdrantSearchError(
@@ -165,18 +208,18 @@ export class QdrantService {
   }
 
   /**
-   * ポイントの削除
+   * ベクトルポイントの削除
    */
-  async deletePoints(collectionName: string, pointIds: string[]): Promise<void> {
+  async deleteVectors(collectionName: string, pointIds: string[]): Promise<void> {
     await this.connect();
 
     if (pointIds.length === 0) {
-      logger.debug('No points to delete');
+      logger.debug('No vectors to delete');
       return;
     }
 
     try {
-      logger.debug(`Deleting ${pointIds.length} points from collection: ${collectionName}`);
+      logger.debug(`Deleting ${pointIds.length} vectors from collection: ${collectionName}`);
       const startTime = Date.now();
 
       await this.client.delete(collectionName, {
@@ -185,14 +228,14 @@ export class QdrantService {
       });
 
       const deleteTime = Date.now() - startTime;
-      logger.info(`Deleted ${pointIds.length} points in ${deleteTime}ms`, {
+      logger.info(`Deleted ${pointIds.length} vectors in ${deleteTime}ms`, {
         collection: collectionName,
-        pointCount: pointIds.length,
+        vectorCount: pointIds.length,
       });
     } catch (error) {
-      logger.error(`Failed to delete points from collection: ${collectionName}`, error as Error);
+      logger.error(`Failed to delete vectors from collection: ${collectionName}`, error as Error);
       throw new QdrantDeleteError(
-        `Failed to delete ${pointIds.length} points from ${collectionName}: ${(error as Error).message}`,
+        `Failed to delete ${pointIds.length} vectors from ${collectionName}: ${(error as Error).message}`,
         collectionName,
         pointIds.length,
         error as Error,
@@ -223,13 +266,27 @@ export class QdrantService {
   /**
    * コレクション情報の取得
    */
-  async getCollectionInfo(collectionName: string): Promise<unknown> {
+  async getCollectionInfo(collectionName: string): Promise<CollectionInfo> {
     await this.connect();
 
     try {
       const info = await this.client.getCollection(collectionName);
       logger.debug(`Retrieved collection info: ${collectionName}`);
-      return info;
+
+      // Qdrantのレスポンスを共通インターフェースに変換
+      const qdrantInfo = info as {
+        status?: string;
+        vectors_count?: number;
+        indexed_vectors_count?: number;
+        [key: string]: unknown;
+      };
+
+      return {
+        status: qdrantInfo.status || 'unknown',
+        vectorsCount: qdrantInfo.vectors_count || 0,
+        indexedVectorsCount: qdrantInfo.indexed_vectors_count || 0,
+        ...qdrantInfo,
+      };
     } catch (error) {
       logger.error(`Failed to get collection info: ${collectionName}`, error as Error);
       throw new QdrantCollectionError(
@@ -239,49 +296,6 @@ export class QdrantService {
       );
     }
   }
-
-  /**
-   * 接続状態の確認
-   */
-  isConnectedToQdrant(): boolean {
-    return this.isConnected;
-  }
-
-  /**
-   * 接続を閉じる
-   */
-  async disconnect(): Promise<void> {
-    if (this.isConnected) {
-      // QdrantClientには明示的なdisconnectメソッドがないため、フラグのみリセット
-      this.isConnected = false;
-      logger.info('Disconnected from Qdrant');
-    }
-  }
-}
-
-/**
- * Qdrantサービスの設定
- */
-export interface QdrantConfig {
-  /**
-   * QdrantサーバーのURL
-   */
-  url: string;
-
-  /**
-   * APIキー（オプション）
-   */
-  apiKey?: string;
-
-  /**
-   * タイムアウト時間（ミリ秒）
-   */
-  timeout: number;
-
-  /**
-   * デフォルトのコレクション名
-   */
-  defaultCollection: string;
 }
 
 /**
@@ -342,7 +356,7 @@ export class QdrantUpsertError extends QdrantError {
   constructor(
     message: string,
     public readonly collectionName: string,
-    public readonly pointCount: number,
+    public readonly vectorCount: number,
     cause?: Error,
   ) {
     super(message, cause);
@@ -357,7 +371,7 @@ export class QdrantDeleteError extends QdrantError {
   constructor(
     message: string,
     public readonly collectionName: string,
-    public readonly pointCount: number,
+    public readonly vectorCount: number,
     cause?: Error,
   ) {
     super(message, cause);

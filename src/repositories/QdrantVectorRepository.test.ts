@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { QdrantService, type QdrantConfig } from './QdrantService.js';
+import { QdrantVectorRepository, type VectorRepositoryConfig } from './QdrantVectorRepository.js';
+import type { VectorPoint } from './VectorRepository.js';
 import type { Schemas } from '@qdrant/js-client-rest';
 
 // QdrantClientのモック
@@ -19,9 +20,9 @@ vi.mock('@qdrant/js-client-rest', () => ({
   QdrantClient: vi.fn(() => mockQdrantClient),
 }));
 
-describe('QdrantService', () => {
-  let service: QdrantService;
-  let config: QdrantConfig;
+describe('QdrantVectorRepository', () => {
+  let repository: QdrantVectorRepository;
+  let config: VectorRepositoryConfig;
 
   beforeEach(() => {
     // モックのリセット
@@ -35,22 +36,22 @@ describe('QdrantService', () => {
       defaultCollection: 'test-collection',
     };
 
-    service = new QdrantService(config);
+    repository = new QdrantVectorRepository(config);
   });
 
   afterEach(async () => {
-    await service.disconnect();
+    await repository.disconnect();
   });
 
   describe('constructor', () => {
-    it('設定でQdrantサービスが初期化される', () => {
-      expect(service.isConnectedToQdrant()).toBe(false);
+    it('設定でQdrantリポジトリが初期化される', () => {
+      expect(repository.isConnected()).toBe(false);
     });
 
     it('APIキーなしで初期化される', () => {
       const configWithoutApiKey = { ...config, apiKey: undefined };
-      const serviceWithoutApiKey = new QdrantService(configWithoutApiKey);
-      expect(serviceWithoutApiKey.isConnectedToQdrant()).toBe(false);
+      const repositoryWithoutApiKey = new QdrantVectorRepository(configWithoutApiKey);
+      expect(repositoryWithoutApiKey.isConnected()).toBe(false);
     });
   });
 
@@ -61,10 +62,10 @@ describe('QdrantService', () => {
         version: '1.0.0',
       });
 
-      await service.connect();
+      await repository.connect();
 
       expect(mockQdrantClient.versionInfo).toHaveBeenCalled();
-      expect(service.isConnectedToQdrant()).toBe(true);
+      expect(repository.isConnected()).toBe(true);
     });
 
     it('既に接続済みの場合は再接続を試行しない', async () => {
@@ -74,19 +75,19 @@ describe('QdrantService', () => {
       });
 
       // 最初の接続
-      await service.connect();
+      await repository.connect();
       expect(mockQdrantClient.versionInfo).toHaveBeenCalledTimes(1);
 
       // 2回目の呼び出し
-      await service.connect();
+      await repository.connect();
       expect(mockQdrantClient.versionInfo).toHaveBeenCalledTimes(1); // 増えない
     });
 
     it('接続エラーが適切に処理される', async () => {
       mockQdrantClient.versionInfo.mockRejectedValue(new Error('Connection failed'));
 
-      await expect(service.connect()).rejects.toThrow('Failed to connect to Qdrant');
-      expect(service.isConnectedToQdrant()).toBe(false);
+      await expect(repository.connect()).rejects.toThrow('Failed to connect to Qdrant');
+      expect(repository.isConnected()).toBe(false);
     });
   });
 
@@ -96,7 +97,7 @@ describe('QdrantService', () => {
         title: 'qdrant',
         version: '1.0.0',
       });
-      await service.connect();
+      await repository.connect();
     });
 
     it('新しいコレクションが作成される', async () => {
@@ -105,7 +106,7 @@ describe('QdrantService', () => {
       });
       mockQdrantClient.createCollection.mockResolvedValue({});
 
-      await service.ensureCollection('test-collection', 384);
+      await repository.ensureCollection('test-collection', 384);
 
       expect(mockQdrantClient.getCollections).toHaveBeenCalled();
       expect(mockQdrantClient.createCollection).toHaveBeenCalledWith('test-collection', {
@@ -121,7 +122,7 @@ describe('QdrantService', () => {
         collections: [{ name: 'test-collection' }],
       });
 
-      await service.ensureCollection('test-collection', 384);
+      await repository.ensureCollection('test-collection', 384);
 
       expect(mockQdrantClient.getCollections).toHaveBeenCalled();
       expect(mockQdrantClient.createCollection).not.toHaveBeenCalled();
@@ -133,23 +134,23 @@ describe('QdrantService', () => {
       });
       mockQdrantClient.createCollection.mockRejectedValue(new Error('Creation failed'));
 
-      await expect(service.ensureCollection('test-collection', 384)).rejects.toThrow(
+      await expect(repository.ensureCollection('test-collection', 384)).rejects.toThrow(
         'Failed to ensure collection',
       );
     });
   });
 
-  describe('upsertPoints', () => {
+  describe('upsertVectors', () => {
     beforeEach(async () => {
       mockQdrantClient.versionInfo.mockResolvedValue({
         title: 'qdrant',
         version: '1.0.0',
       });
-      await service.connect();
+      await repository.connect();
     });
 
-    it('ポイントが正常にアップサートされる', async () => {
-      const points: Schemas['PointStruct'][] = [
+    it('ベクトルが正常にアップサートされる', async () => {
+      const vectors: VectorPoint[] = [
         {
           id: 'point1',
           vector: [0.1, 0.2, 0.3],
@@ -164,22 +165,26 @@ describe('QdrantService', () => {
 
       mockQdrantClient.upsert.mockResolvedValue({});
 
-      await service.upsertPoints('test-collection', points);
+      await repository.upsertVectors('test-collection', vectors);
 
       expect(mockQdrantClient.upsert).toHaveBeenCalledWith('test-collection', {
         wait: true,
-        points,
+        points: vectors.map((v) => ({
+          id: v.id,
+          vector: v.vector,
+          payload: v.payload,
+        })),
       });
     });
 
     it('空の配列の場合は処理をスキップする', async () => {
-      await service.upsertPoints('test-collection', []);
+      await repository.upsertVectors('test-collection', []);
 
       expect(mockQdrantClient.upsert).not.toHaveBeenCalled();
     });
 
     it('アップサートエラーが適切に処理される', async () => {
-      const points: Schemas['PointStruct'][] = [
+      const vectors: VectorPoint[] = [
         {
           id: 'point1',
           vector: [0.1, 0.2, 0.3],
@@ -189,19 +194,19 @@ describe('QdrantService', () => {
 
       mockQdrantClient.upsert.mockRejectedValue(new Error('Upsert failed'));
 
-      await expect(service.upsertPoints('test-collection', points)).rejects.toThrow(
+      await expect(repository.upsertVectors('test-collection', vectors)).rejects.toThrow(
         'Failed to upsert',
       );
     });
   });
 
-  describe('searchPoints', () => {
+  describe('searchVectors', () => {
     beforeEach(async () => {
       mockQdrantClient.versionInfo.mockResolvedValue({
         title: 'qdrant',
         version: '1.0.0',
       });
-      await service.connect();
+      await repository.connect();
     });
 
     it('ベクトル検索が正常に実行される', async () => {
@@ -222,16 +227,29 @@ describe('QdrantService', () => {
 
       mockQdrantClient.search.mockResolvedValue(mockResults);
 
-      const vector = [0.1, 0.2, 0.3];
-      const results = await service.searchPoints('test-collection', vector, 10);
+      const queryVector = [0.1, 0.2, 0.3];
+      const results = await repository.searchVectors('test-collection', queryVector, 10);
 
       expect(mockQdrantClient.search).toHaveBeenCalledWith('test-collection', {
-        vector,
+        vector: queryVector,
         limit: 10,
         score_threshold: undefined,
         with_payload: true,
       });
-      expect(results).toEqual(mockResults);
+      expect(results).toEqual([
+        {
+          id: 'point1',
+          score: 0.95,
+          payload: { text: 'マッチしたテキスト1' },
+          vector: undefined,
+        },
+        {
+          id: 'point2',
+          score: 0.87,
+          payload: { text: 'マッチしたテキスト2' },
+          vector: undefined,
+        },
+      ]);
     });
 
     it('スコア閾値付きで検索が実行される', async () => {
@@ -246,60 +264,67 @@ describe('QdrantService', () => {
 
       mockQdrantClient.search.mockResolvedValue(mockResults);
 
-      const vector = [0.1, 0.2, 0.3];
-      const results = await service.searchPoints('test-collection', vector, 10, 0.8);
+      const queryVector = [0.1, 0.2, 0.3];
+      const results = await repository.searchVectors('test-collection', queryVector, 10, 0.8);
 
       expect(mockQdrantClient.search).toHaveBeenCalledWith('test-collection', {
-        vector,
+        vector: queryVector,
         limit: 10,
         score_threshold: 0.8,
         with_payload: true,
       });
-      expect(results).toEqual(mockResults);
+      expect(results).toEqual([
+        {
+          id: 'point1',
+          score: 0.95,
+          payload: { text: 'マッチしたテキスト' },
+          vector: undefined,
+        },
+      ]);
     });
 
     it('検索エラーが適切に処理される', async () => {
       mockQdrantClient.search.mockRejectedValue(new Error('Search failed'));
 
-      const vector = [0.1, 0.2, 0.3];
-      await expect(service.searchPoints('test-collection', vector, 10)).rejects.toThrow(
+      const queryVector = [0.1, 0.2, 0.3];
+      await expect(repository.searchVectors('test-collection', queryVector, 10)).rejects.toThrow(
         'Failed to search',
       );
     });
   });
 
-  describe('deletePoints', () => {
+  describe('deleteVectors', () => {
     beforeEach(async () => {
       mockQdrantClient.versionInfo.mockResolvedValue({
         title: 'qdrant',
         version: '1.0.0',
       });
-      await service.connect();
+      await repository.connect();
     });
 
-    it('ポイントが正常に削除される', async () => {
-      const pointIds = ['point1', 'point2', 'point3'];
+    it('ベクトルが正常に削除される', async () => {
+      const vectorIds = ['point1', 'point2', 'point3'];
       mockQdrantClient.delete.mockResolvedValue({});
 
-      await service.deletePoints('test-collection', pointIds);
+      await repository.deleteVectors('test-collection', vectorIds);
 
       expect(mockQdrantClient.delete).toHaveBeenCalledWith('test-collection', {
         wait: true,
-        points: pointIds,
+        points: vectorIds,
       });
     });
 
     it('空の配列の場合は処理をスキップする', async () => {
-      await service.deletePoints('test-collection', []);
+      await repository.deleteVectors('test-collection', []);
 
       expect(mockQdrantClient.delete).not.toHaveBeenCalled();
     });
 
     it('削除エラーが適切に処理される', async () => {
-      const pointIds = ['point1'];
+      const vectorIds = ['point1'];
       mockQdrantClient.delete.mockRejectedValue(new Error('Delete failed'));
 
-      await expect(service.deletePoints('test-collection', pointIds)).rejects.toThrow(
+      await expect(repository.deleteVectors('test-collection', vectorIds)).rejects.toThrow(
         'Failed to delete',
       );
     });
@@ -311,13 +336,13 @@ describe('QdrantService', () => {
         title: 'qdrant',
         version: '1.0.0',
       });
-      await service.connect();
+      await repository.connect();
     });
 
     it('コレクションが正常に削除される', async () => {
       mockQdrantClient.deleteCollection.mockResolvedValue({});
 
-      await service.deleteCollection('test-collection');
+      await repository.deleteCollection('test-collection');
 
       expect(mockQdrantClient.deleteCollection).toHaveBeenCalledWith('test-collection');
     });
@@ -325,7 +350,7 @@ describe('QdrantService', () => {
     it('コレクション削除エラーが適切に処理される', async () => {
       mockQdrantClient.deleteCollection.mockRejectedValue(new Error('Delete collection failed'));
 
-      await expect(service.deleteCollection('test-collection')).rejects.toThrow(
+      await expect(repository.deleteCollection('test-collection')).rejects.toThrow(
         'Failed to delete collection',
       );
     });
@@ -337,7 +362,7 @@ describe('QdrantService', () => {
         title: 'qdrant',
         version: '1.0.0',
       });
-      await service.connect();
+      await repository.connect();
     });
 
     it('コレクション情報が正常に取得される', async () => {
@@ -349,16 +374,22 @@ describe('QdrantService', () => {
 
       mockQdrantClient.getCollection.mockResolvedValue(mockInfo);
 
-      const info = await service.getCollectionInfo('test-collection');
+      const info = await repository.getCollectionInfo('test-collection');
 
       expect(mockQdrantClient.getCollection).toHaveBeenCalledWith('test-collection');
-      expect(info).toEqual(mockInfo);
+      expect(info).toEqual({
+        status: 'green',
+        vectorsCount: 100,
+        indexedVectorsCount: 100,
+        vectors_count: 100,
+        indexed_vectors_count: 100,
+      });
     });
 
     it('コレクション情報取得エラーが適切に処理される', async () => {
       mockQdrantClient.getCollection.mockRejectedValue(new Error('Get collection failed'));
 
-      await expect(service.getCollectionInfo('test-collection')).rejects.toThrow(
+      await expect(repository.getCollectionInfo('test-collection')).rejects.toThrow(
         'Failed to get collection info',
       );
     });
@@ -370,35 +401,35 @@ describe('QdrantService', () => {
         title: 'qdrant',
         version: '1.0.0',
       });
-      await service.connect();
-      expect(service.isConnectedToQdrant()).toBe(true);
+      await repository.connect();
+      expect(repository.isConnected()).toBe(true);
 
-      await service.disconnect();
-      expect(service.isConnectedToQdrant()).toBe(false);
+      await repository.disconnect();
+      expect(repository.isConnected()).toBe(false);
     });
 
     it('未接続状態でも安全に実行される', async () => {
-      expect(service.isConnectedToQdrant()).toBe(false);
-      await expect(service.disconnect()).resolves.not.toThrow();
+      expect(repository.isConnected()).toBe(false);
+      await expect(repository.disconnect()).resolves.not.toThrow();
     });
   });
 
   describe('統合テスト', () => {
-    it('コレクション作成からポイント操作まで一連の流れが実行される', async () => {
+    it('コレクション作成からベクトル操作まで一連の流れが実行される', async () => {
       // 接続
       mockQdrantClient.versionInfo.mockResolvedValue({
         title: 'qdrant',
         version: '1.0.0',
       });
-      await service.connect();
+      await repository.connect();
 
       // コレクション作成
       mockQdrantClient.getCollections.mockResolvedValue({ collections: [] });
       mockQdrantClient.createCollection.mockResolvedValue({});
-      await service.ensureCollection('integration-test', 384);
+      await repository.ensureCollection('integration-test', 384);
 
-      // ポイント挿入
-      const points: Schemas['PointStruct'][] = [
+      // ベクトル挿入
+      const vectors: VectorPoint[] = [
         {
           id: 'test-point',
           vector: [0.1, 0.2, 0.3],
@@ -406,7 +437,7 @@ describe('QdrantService', () => {
         },
       ];
       mockQdrantClient.upsert.mockResolvedValue({});
-      await service.upsertPoints('integration-test', points);
+      await repository.upsertVectors('integration-test', vectors);
 
       // 検索
       const mockResults: Schemas['ScoredPoint'][] = [
@@ -418,18 +449,25 @@ describe('QdrantService', () => {
         },
       ];
       mockQdrantClient.search.mockResolvedValue(mockResults);
-      const results = await service.searchPoints('integration-test', [0.1, 0.2, 0.3], 5);
+      const results = await repository.searchVectors('integration-test', [0.1, 0.2, 0.3], 5);
 
-      // ポイント削除
+      // ベクトル削除
       mockQdrantClient.delete.mockResolvedValue({});
-      await service.deletePoints('integration-test', ['test-point']);
+      await repository.deleteVectors('integration-test', ['test-point']);
 
       // 検証
       expect(mockQdrantClient.createCollection).toHaveBeenCalled();
       expect(mockQdrantClient.upsert).toHaveBeenCalled();
       expect(mockQdrantClient.search).toHaveBeenCalled();
       expect(mockQdrantClient.delete).toHaveBeenCalled();
-      expect(results).toEqual(mockResults);
+      expect(results).toEqual([
+        {
+          id: 'test-point',
+          score: 0.95,
+          payload: { text: 'テストテキスト' },
+          vector: undefined,
+        },
+      ]);
     });
   });
 });
