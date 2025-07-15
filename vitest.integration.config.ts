@@ -4,8 +4,8 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'node',
-    include: ['tests/**/*.test.ts', 'src/**/*.test.ts'],
-    exclude: ['src/integration/**/*.test.ts'], // 統合テストは除外
+    include: ['src/integration/**/*.test.ts'],
+    testTimeout: 30000, // 統合テストは時間がかかる場合があるので長めに設定
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],
