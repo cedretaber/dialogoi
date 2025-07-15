@@ -9,14 +9,16 @@
 
 Dialogoi は小説執筆支援のための RAG 搭載 MCP（Model Context Protocol）サーバーです。
 
-**技術構成**: 
+**技術構成**:
+
 - TypeScript + Node.js ≥ 20
 - FlexSearch（キーワード検索）+ Qdrant（ベクトル検索）
 - kuromojin（日本語形態素解析）
 - @huggingface/transformers（multilingual-e5-small）
 - MCP SDK
 
-**目標**: 
+**目標**:
+
 - 自然言語クエリから関連テキストチャンク（ID とスニペット）を返すRAG機能
 - キーワード検索とベクトル検索のハイブリッド検索
 - ホットリロード（プロジェクトファイルの変更をリアルタイムで反映）
@@ -33,6 +35,7 @@ MCP API → NovelService → Repository/SearchService/FileOperationsService → 
 ```
 
 **設計パターン**:
+
 - Repository パターン（データアクセス層）
 - Service パターン（ビジネスロジック層）
 - Backend パターン（検索エンジン抽象化）
@@ -63,15 +66,15 @@ src/
 
 ## 3. 依存ライブラリ
 
-| パッケージ                    | バージョン | 用途                           |
-| ----------------------------- | ---------- | ------------------------------ |
-| `@huggingface/transformers`   | ^3.6.3     | multilingual-e5-small embedding |
-| `@qdrant/js-client-rest`      | ^1.14.1    | Qdrant ベクトルDB接続          |
-| `flexsearch`                  | ^0.8.2     | 全文検索（キーワード検索）     |
-| `kuromojin`                   | ^3.0.1     | 日本語形態素解析               |
-| `@modelcontextprotocol/sdk`   | ^1.12.3    | MCPサーバー実装                |
-| `chokidar`                    | ^4.0.3     | ファイル監視                   |
-| `zod`                         | ^3.25.67   | スキーマ検証                   |
+| パッケージ                  | バージョン | 用途                            |
+| --------------------------- | ---------- | ------------------------------- |
+| `@huggingface/transformers` | ^3.6.3     | multilingual-e5-small embedding |
+| `@qdrant/js-client-rest`    | ^1.14.1    | Qdrant ベクトルDB接続           |
+| `flexsearch`                | ^0.8.2     | 全文検索（キーワード検索）      |
+| `kuromojin`                 | ^3.0.1     | 日本語形態素解析                |
+| `@modelcontextprotocol/sdk` | ^1.12.3    | MCPサーバー実装                 |
+| `chokidar`                  | ^4.0.3     | ファイル監視                    |
+| `zod`                       | ^3.25.67   | スキーマ検証                    |
 
 ---
 
@@ -86,6 +89,7 @@ multilingual-e5-small モデルを使用した embedding 生成機能と、Qdran
 #### 4.2.1 Embedding サービス層
 
 **`src/services/EmbeddingService.ts`**
+
 ```typescript
 interface EmbeddingService {
   generateEmbedding(text: string): Promise<number[]>;
@@ -96,6 +100,7 @@ interface EmbeddingService {
 ```
 
 **`src/services/TransformersEmbeddingService.ts`**
+
 ```typescript
 export class TransformersEmbeddingService implements EmbeddingService {
   private readonly modelName = 'intfloat/multilingual-e5-small';
@@ -107,11 +112,16 @@ export class TransformersEmbeddingService implements EmbeddingService {
 #### 4.2.2 Qdrant 接続・管理サービス
 
 **`src/services/QdrantService.ts`**
+
 ```typescript
 export class QdrantService {
   async ensureCollection(collectionName: string, vectorSize: number): Promise<void>;
   async upsertPoints(collectionName: string, points: PointStruct[]): Promise<void>;
-  async searchPoints(collectionName: string, vector: number[], limit: number): Promise<ScoredPoint[]>;
+  async searchPoints(
+    collectionName: string,
+    vector: number[],
+    limit: number,
+  ): Promise<ScoredPoint[]>;
   async deletePoints(collectionName: string, pointIds: string[]): Promise<void>;
 }
 ```
@@ -119,6 +129,7 @@ export class QdrantService {
 #### 4.2.3 ベクトル検索バックエンド
 
 **`src/backends/VectorBackend.ts`**
+
 ```typescript
 export class VectorBackend extends SearchBackend {
   async search(query: string, k: number, novelId: string): Promise<SearchResult[]>;
@@ -129,6 +140,7 @@ export class VectorBackend extends SearchBackend {
 ```
 
 **`src/backends/HybridBackend.ts`**
+
 ```typescript
 export class HybridBackend extends SearchBackend {
   constructor(
@@ -170,6 +182,7 @@ interface DialogoiConfig {
 #### 4.4.1 Qdrant 接続の段階的初期化
 
 **セキュリティ重視のアプローチ:**
+
 - ポート自動検出を廃止 → 指定ポートのみ使用
 - Docker失敗時は即座にフォールバック
 - 明確なエラーログとRAG無効化
@@ -203,15 +216,15 @@ interface DialogoiConfig {
 
 ```typescript
 interface QdrantConfig {
-  url?: string;              // 明示的な接続先
+  url?: string; // 明示的な接続先
   apiKey?: string;
-  port: number;              // デフォルト: 6333（固定）
-  
+  port: number; // デフォルト: 6333（固定）
+
   docker: {
-    enabled: boolean;        // デフォルト: true
-    image: string;          // デフォルト: 'qdrant/qdrant'
-    timeout: number;        // デフォルト: 30000ms
-    autoCleanup: boolean;   // 終了時にコンテナ削除
+    enabled: boolean; // デフォルト: true
+    image: string; // デフォルト: 'qdrant/qdrant'
+    timeout: number; // デフォルト: 30000ms
+    autoCleanup: boolean; // 終了時にコンテナ削除
   };
 }
 ```
@@ -225,30 +238,35 @@ interface QdrantConfig {
 ### 4.5 実装フェーズ
 
 #### Phase 3-1: Embedding サービス実装（優先度：高）
+
 - [ ] `EmbeddingService` インターフェースの定義
 - [ ] `TransformersEmbeddingService` の実装
 - [ ] multilingual-e5-small モデルの統合
 - [ ] バッチ処理機能の実装
 
 #### Phase 3-2: Qdrant 統合（優先度：高）
+
 - [ ] `QdrantService` の実装
 - [ ] 接続管理とエラーハンドリング
 - [ ] コレクション管理機能
 - [ ] CRUD 操作の実装
 
 #### Phase 3-3: ベクトル検索バックエンド（優先度：高）
+
 - [ ] `VectorBackend` の実装
 - [ ] SearchBackend 抽象クラスの継承
 - [ ] チャンクのベクトル化とインデックス
 - [ ] ベクトル検索機能
 
 #### Phase 3-4: ハイブリッド検索（優先度：中）
+
 - [ ] `HybridBackend` の実装
 - [ ] キーワード + ベクトル検索結果の統合
 - [ ] スコアの正規化とマージ
 - [ ] 重み付け機能
 
 #### Phase 3-5: 設定とテスト（優先度：中）
+
 - [ ] 設定ファイルの拡張
 - [ ] 初期化戦略の実装
 - [ ] フォールバック機能の実装
@@ -259,11 +277,13 @@ interface QdrantConfig {
 ## 5. 開発コマンド
 
 ### 5.1 基本開発
+
 - `npm run dev` - ts-node を使用して開発サーバーを起動
 - `npm run build` - TypeScript を dist/ にビルド
 - `npm run start` - dist/ からビルド済みサーバーを実行
 
 ### 5.2 テストと品質管理
+
 - `npm test` - vitest でテストを実行
 - `npm run test:watch` - ウォッチモードでテストを実行
 - `npm run lint` - ESLint チェック（警告0個を強制）
