@@ -22,7 +22,7 @@ export class Chunk {
   constructor(
     public title: string, // 章・節タイトル
     public content: string, // チャンク本文
-    public filePath: string, // プロジェクトルートからの相対パス (例: "sample_novel/contents/chapter_1.txt")
+    public relativeFilePath: string, // プロジェクトルートからの相対パス (例: "sample_novel/contents/chapter_1.txt")
     public startLine: number, // 開始行番号
     public endLine: number, // 終了行番号
     public chunkIndex: number, // チャンク番号
@@ -34,7 +34,7 @@ export class Chunk {
    * ベースID（ハッシュなし）を取得
    */
   get baseId(): string {
-    return `${this.filePath}::${this.startLine}-${this.endLine}::chunk-${this.chunkIndex}`;
+    return `${this.relativeFilePath}::${this.startLine}-${this.endLine}::chunk-${this.chunkIndex}`;
   }
 
   /**
@@ -76,9 +76,9 @@ export abstract class SearchBackend {
 
   /**
    * 指定ファイルに関連するチャンクをすべて削除
-   * @param filePath 削除対象のファイルパス
+   * @param relativeFilePath 削除対象のファイルパス（プロジェクトルートからの相対パス）
    */
-  abstract removeByFile(filePath: string): Promise<void>;
+  abstract removeByFile(relativeFilePath: string): Promise<void>;
 
   /**
    * 指定小説プロジェクトに関連するチャンクをすべて削除

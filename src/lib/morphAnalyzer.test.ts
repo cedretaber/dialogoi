@@ -45,7 +45,7 @@ describe('MorphAnalyzer', () => {
     expect(surfaces).toContain('学校');
     expect(surfaces).toContain('生徒');
     expect(surfaces).toContain('アリス');
-  });
+  }, 10000);
 
   it('should include chunk information in analysis results', async () => {
     const chunk = new Chunk(

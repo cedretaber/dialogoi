@@ -119,7 +119,7 @@ export class VectorBackend extends SearchBackend {
         payload: {
           title: chunk.title,
           content: chunk.content,
-          filePath: chunk.filePath,
+          relativeFilePath: chunk.relativeFilePath,
           startLine: chunk.startLine,
           endLine: chunk.endLine,
           chunkIndex: chunk.chunkIndex,
@@ -188,23 +188,23 @@ export class VectorBackend extends SearchBackend {
 
   /**
    * 指定ファイルに関連するチャンクを削除
+   * @param relativeFilePath プロジェクトルートからの相対パス
    */
-  async removeByFile(filePath: string): Promise<void> {
+  async removeByFile(relativeFilePath: string): Promise<void> {
     try {
-      logger.debug(`Removing chunks from vector index for file: ${filePath}`);
+      logger.debug(`Removing chunks from vector index for file: ${relativeFilePath}`);
+      const startTime = Date.now();
 
-      // ファイルパスに基づいてベクトルポイントを検索
-      // 実際の実装では、payloadでフィルタリングして削除対象を特定する必要がある
-      // 簡単な実装として、ここでは警告ログのみ
-      logger.warn(
-        'removeByFile not fully implemented - requires payload-based filtering in vector store',
-        { filePath },
+      // ファイルパスでフィルタリングして削除
+      await this.vectorRepository.deleteVectorsByFilePath(
+        this.config.collectionName,
+        relativeFilePath,
       );
 
-      // TODO: 実装が必要
-      // 1. ファイルパスでフィルタリング
-      // 2. 該当するベクトルポイントIDを取得
-      // 3. vectorRepository.deleteVectors()を呼び出し
+      const removeTime = Date.now() - startTime;
+      logger.info(`Removed chunks by file from vector index in ${removeTime}ms`, {
+        relativeFilePath,
+      });
     } catch (error) {
       logger.error('Failed to remove chunks by file from vector index', error as Error);
       throw new VectorBackendError(
@@ -220,18 +220,13 @@ export class VectorBackend extends SearchBackend {
   async removeByNovel(novelId: string): Promise<void> {
     try {
       logger.debug(`Removing chunks from vector index for novel: ${novelId}`);
+      const startTime = Date.now();
 
-      // 小説IDに基づいてベクトルポイントを検索
-      // 実際の実装では、payloadでフィルタリングして削除対象を特定する必要がある
-      logger.warn(
-        'removeByNovel not fully implemented - requires payload-based filtering in vector store',
-        { novelId },
-      );
+      // 小説IDでフィルタリングして削除
+      await this.vectorRepository.deleteVectorsByNovelId(this.config.collectionName, novelId);
 
-      // TODO: 実装が必要
-      // 1. 小説IDでフィルタリング
-      // 2. 該当するベクトルポイントIDを取得
-      // 3. vectorRepository.deleteVectors()を呼び出し
+      const removeTime = Date.now() - startTime;
+      logger.info(`Removed chunks by novel from vector index in ${removeTime}ms`, { novelId });
     } catch (error) {
       logger.error('Failed to remove chunks by novel from vector index', error as Error);
       throw new VectorBackendError(
@@ -277,7 +272,7 @@ export class VectorBackend extends SearchBackend {
           score: result.score,
           snippet,
           payload: {
-            file: payload?.filePath as string,
+            file: payload?.relativeFilePath as string,
             start: payload?.startLine as number,
             end: payload?.endLine as number,
             tags: payload?.tags as string[],

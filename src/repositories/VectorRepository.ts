@@ -44,6 +44,17 @@ export interface VectorRepository {
   deleteVectors(collectionName: string, pointIds: string[]): Promise<void>;
 
   /**
+   * ファイルパスによるベクトルポイントの削除
+   * @param relativeFilePath プロジェクトルートからの相対パス
+   */
+  deleteVectorsByFilePath(collectionName: string, relativeFilePath: string): Promise<void>;
+
+  /**
+   * 小説IDによるベクトルポイントの削除
+   */
+  deleteVectorsByNovelId(collectionName: string, novelId: string): Promise<void>;
+
+  /**
    * コレクションの削除
    */
   deleteCollection(collectionName: string): Promise<void>;

@@ -169,11 +169,24 @@ describe('QdrantVectorRepository', () => {
 
       expect(mockQdrantClient.upsert).toHaveBeenCalledWith('test-collection', {
         wait: true,
-        points: vectors.map((v) => ({
-          id: v.id,
-          vector: v.vector,
-          payload: v.payload,
-        })),
+        points: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.any(String),
+            vector: [0.1, 0.2, 0.3],
+            payload: expect.objectContaining({
+              text: 'テストテキスト1',
+              originalId: 'point1',
+            }),
+          }),
+          expect.objectContaining({
+            id: expect.any(String),
+            vector: [0.4, 0.5, 0.6],
+            payload: expect.objectContaining({
+              text: 'テストテキスト2',
+              originalId: 'point2',
+            }),
+          }),
+        ]),
       });
     });
 
@@ -310,7 +323,7 @@ describe('QdrantVectorRepository', () => {
 
       expect(mockQdrantClient.delete).toHaveBeenCalledWith('test-collection', {
         wait: true,
-        points: vectorIds,
+        points: expect.any(Array),
       });
     });
 

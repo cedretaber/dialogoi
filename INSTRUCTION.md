@@ -1,6 +1,6 @@
 # Dialogoi ― 実装インストラクション
 
-> **現在のフェーズ**: Phase 3 - Qdrant統合とベクトル検索実装
+> **現在のフェーズ**: Phase 3-4 - FlexSearch廃止とアーキテクチャ簡素化
 > **最終更新**: 2025-01-15
 
 ---
@@ -12,21 +12,21 @@ Dialogoi は小説執筆支援のための RAG 搭載 MCP（Model Context Protoc
 **技術構成**:
 
 - TypeScript + Node.js ≥ 20
-- FlexSearch（キーワード検索）+ Qdrant（ベクトル検索）
-- kuromojin（日本語形態素解析）
+- Qdrant（ベクトル検索）
 - @huggingface/transformers（multilingual-e5-small）
 - MCP SDK
 
 **目標**:
 
 - 自然言語クエリから関連テキストチャンク（ID とスニペット）を返すRAG機能
-- キーワード検索とベクトル検索のハイブリッド検索
+- 単純な文字列検索・正規表現検索（既存実装）
+- ベクトル検索（意味的類似度検索）
 - ホットリロード（プロジェクトファイルの変更をリアルタイムで反映）
 - 外部依存最小化（Docker / GPU 不要）
 
 ---
 
-## 2. 現在のアーキテクチャ（Phase 2 完了後）
+## 2. 現在のアーキテクチャ（Phase 3-3 完了後）
 
 ### 2.1 レイヤー構成
 
@@ -58,7 +58,8 @@ src/
 │   └── QdrantVectorRepository.ts      # Qdrant実装
 ├── backends/
 │   ├── SearchBackend.ts          # 検索エンジン抽象化
-│   └── KeywordFlexBackend.ts     # FlexSearch実装
+│   ├── KeywordFlexBackend.ts     # FlexSearch実装（削除予定）
+│   └── VectorBackend.ts          # ベクトル検索実装
 ├── lib/
 │   ├── indexerManager.ts         # インデックス管理
 │   ├── chunker.ts                # チャンク化処理
@@ -68,25 +69,11 @@ src/
 
 ---
 
-## 3. 依存ライブラリ
-
-| パッケージ                  | バージョン | 用途                            |
-| --------------------------- | ---------- | ------------------------------- |
-| `@huggingface/transformers` | ^3.6.3     | multilingual-e5-small embedding |
-| `@qdrant/js-client-rest`    | ^1.14.1    | Qdrant ベクトルDB接続           |
-| `flexsearch`                | ^0.8.2     | 全文検索（キーワード検索）      |
-| `kuromojin`                 | ^3.0.1     | 日本語形態素解析                |
-| `@modelcontextprotocol/sdk` | ^1.12.3    | MCPサーバー実装                 |
-| `chokidar`                  | ^4.0.3     | ファイル監視                    |
-| `zod`                       | ^3.25.67   | スキーマ検証                    |
-
----
-
 ## 4. Phase 3: Qdrant統合とベクトル検索実装
 
 ### 4.1 実装目標
 
-multilingual-e5-small モデルを使用した embedding 生成機能と、Qdrant によるベクトル検索機能を追加し、既存のキーワード検索と組み合わせたハイブリッド検索を実現する。
+multilingual-e5-small モデルを使用した embedding 生成機能と、Qdrant によるベクトル検索機能を実装。FlexSearchと形態素解析を廃止し、システムアーキテクチャを簡素化する。
 
 ### 4.2 新規実装モジュール
 
@@ -156,19 +143,6 @@ export class VectorBackend extends SearchBackend {
 }
 ```
 
-**`src/backends/HybridBackend.ts`**
-
-```typescript
-export class HybridBackend extends SearchBackend {
-  constructor(
-    private keywordBackend: KeywordFlexBackend,
-    private vectorBackend: VectorBackend,
-    private hybridWeight: number = 0.5
-  );
-  // キーワード + ベクトル検索結果の統合
-}
-```
-
 ### 4.3 設定の拡張
 
 ```typescript
@@ -185,11 +159,6 @@ interface DialogoiConfig {
     apiKey?: string;
     collection: string; // 'dialogoi-chunks'
     timeout: number;
-  };
-  hybrid: {
-    enabled: boolean;
-    keywordWeight: number; // 0.5
-    vectorWeight: number; // 0.5
   };
 }
 ```
@@ -208,7 +177,7 @@ interface DialogoiConfig {
 
 1. **Phase 1: 明示的な接続先を試行**
    - 設定で `qdrant.url` が指定されている場合、その接続先に接続
-   - 接続失敗時は即座にキーワード検索モードにフォールバック（Docker試行せず）
+   - 接続失敗時は即座に文字列検索モードにフォールバック（Docker試行せず）
 
 2. **Phase 2: Docker自動起動を試行**
    - 設定で `docker.enabled = true` の場合のみ実行
@@ -220,7 +189,7 @@ interface DialogoiConfig {
 
 3. **Phase 3: フォールバック（キーワード検索のみ）**
    - すべての試行が失敗した場合、RAG機能を無効化
-   - 既存のキーワード検索（FlexSearch）のみで動作
+   - 既存のキーワード検索（正規表現使用可能な全文検索）のみで動作
    - 明確な警告ログを出力
 
 #### 4.4.2 Embedding サービスの遅延初期化
@@ -248,8 +217,8 @@ interface QdrantConfig {
 
 #### 4.4.4 フォールバック機能
 
-- **Qdrant 利用不可時**: キーワード検索のみで動作
-- **embedding 生成失敗時**: 既存のキーワード検索結果を返す
+- **Qdrant 利用不可時**: 文字列検索・正規表現検索のみで動作
+- **embedding 生成失敗時**: 既存の文字列検索結果を返す
 - **モデル読み込み失敗時**: graceful degradation
 
 ### 4.5 実装フェーズ
@@ -269,26 +238,63 @@ interface QdrantConfig {
 - [x] コレクション管理機能
 - [x] CRUD 操作の実装
 
-#### Phase 3-3: ベクトル検索バックエンド（優先度：高）
+#### Phase 3-3: ベクトル検索バックエンド（優先度：高）✅ **完了**
 
-- [ ] `VectorBackend` の実装
-- [ ] SearchBackend 抽象クラスの継承
-- [ ] チャンクのベクトル化とインデックス
-- [ ] ベクトル検索機能
+- [x] `VectorBackend` の実装
+- [x] SearchBackend 抽象クラスの継承
+- [x] チャンクのベクトル化とインデックス
+- [x] ベクトル検索機能
+- [x] テストの作成と実行
 
-#### Phase 3-4: ハイブリッド検索（優先度：中）
+#### Phase 3-4: FlexSearch廃止とアーキテクチャ簡素化（優先度：高）
 
-- [ ] `HybridBackend` の実装
-- [ ] キーワード + ベクトル検索結果の統合
-- [ ] スコアの正規化とマージ
-- [ ] 重み付け機能
+- [ ] FlexSearch 関連コードの削除
+- [ ] `KeywordFlexBackend` の削除
+- [ ] kuromojin 関連コードの削除
+- [ ] `IndexerManager` をベクトル検索対応に更新
+- [ ] `search_rag` ツールを `VectorBackend` 使用に更新
+- [ ] 不要な依存関係を package.json から削除
+- [ ] テストの更新と実行
 
-#### Phase 3-5: 設定とテスト（優先度：中）
+#### Phase 3-5: 設定と初期化戦略（優先度：中）
 
-- [ ] 設定ファイルの拡張
-- [ ] 初期化戦略の実装
+- [ ] Qdrant 接続の初期化戦略実装
+- [ ] Docker 自動起動機能の実装
 - [ ] フォールバック機能の実装
 - [ ] 包括的なテストの作成
+
+---
+
+### Phase 3-4 実装詳細
+
+#### 3-4.1 FlexSearch 関連コードの削除
+
+**削除対象ファイル:**
+
+- `src/backends/KeywordFlexBackend.ts`
+- `src/backends/KeywordFlexBackend.test.ts`
+- FlexSearch に依存するコード
+
+**削除対象ライブラリ:**
+
+- flexsearch
+- kuromojin
+- @types/kuromojin
+
+#### 3-4.2 IndexerManager の更新
+
+`IndexerManager` を `VectorBackend` を使用するように更新:
+
+- `KeywordFlexBackend` への依存を削除
+- `VectorBackend` と `EmbeddingService`、`VectorRepository` を統合
+- ベクトル検索用のインデックス管理を実装
+
+#### 3-4.3 search_rag ツールの更新
+
+`search_rag` ツールを `VectorBackend` を使用するように更新:
+
+- `IndexerSearchService` 経由で `VectorBackend` を呼び出す
+- フォールバック時のエラーハンドリングを実装
 
 ---
 
@@ -296,7 +302,7 @@ interface QdrantConfig {
 
 ### 5.1 基本開発
 
-- `npm run dev` - ts-node を使用して開発サーバーを起動
+- `npm run dev` - tsx を使用して開発サーバーを起動
 - `npm run build` - TypeScript を dist/ にビルド
 - `npm run start` - dist/ からビルド済みサーバーを実行
 
@@ -335,7 +341,8 @@ novels/
 - `list_novel_projects` - 利用可能な小説プロジェクト一覧
 - `list_novel_settings/content/instructions` - プレビュー付きファイル一覧
 - `get_novel_settings/content/instructions` - ファイル内容を取得
-- `search_novel_settings/content` - ファイル内検索
+- `search_novel_settings/content` - ファイル内検索（文字列・正規表現）
+- `search_rag` - ベクトル検索（意味的類似度）
 - `add_novel_setting/content` - 新規ファイル作成（セキュリティチェック付き）
 
 ---
@@ -343,7 +350,9 @@ novels/
 ## 7. 進捗管理
 
 **開始日**: 2025-01-15
-**目標完了日**: 2025-01-22 (1週間)
+**Phase 3-3 完了日**: 2025-01-15
+**Phase 3-4 開始日**: 2025-01-15
+**目標完了日**: 2025-01-18
 
 **進捗追跡**: 各フェーズ完了時に INSTRUCTION.md を更新
 

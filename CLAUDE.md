@@ -4,7 +4,7 @@
 
 ## 利用言語について
 
-- ユーザとのコミュニケーションには日本語を利用してください
+- ユーザとのコミュニケーションには日本語を使用してください
 - コード中のコメントやテストケース名も可能な限り日本語でお願いします
 
 ## プロジェクト概要
@@ -18,7 +18,7 @@ Dialogoi は小説執筆支援のための RAG 搭載 MCP（Model Context Protoc
 
 ### 基本開発
 
-- `npm run dev` - ts-node を使用して開発サーバーを起動
+- `npm run dev` - tsx を使用して開発サーバーを起動
 - `npm run build` - TypeScript を dist/ にビルド
 - `npm run start` - dist/ からビルド済みサーバーを実行
 
@@ -77,6 +77,7 @@ Dialogoi は小説執筆支援のための RAG 搭載 MCP（Model Context Protoc
 1. `npm run lint` - ESLint チェック（警告0個必須）
 2. `npm run format` - Prettier フォーマット
 3. `npm run typecheck` - TypeScript 型チェック
-4. `npm test` - 全テストの実行
+4. `npm test` - 全単体テストの実行
+5. `npm test:integration` - インテグレーションテストの実行
 
 これらのチェックを怠ると GitHub Actions CI が失敗する。コミット前に必ず実行すること。

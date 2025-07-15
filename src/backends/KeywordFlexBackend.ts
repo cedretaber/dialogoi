@@ -396,10 +396,10 @@ export class KeywordFlexBackend extends SearchBackend {
     // ファイルパスでグルーピング
     const groupedByFile = new Map<string, Chunk[]>();
     for (const chunk of chunks) {
-      if (!groupedByFile.has(chunk.filePath)) {
-        groupedByFile.set(chunk.filePath, []);
+      if (!groupedByFile.has(chunk.relativeFilePath)) {
+        groupedByFile.set(chunk.relativeFilePath, []);
       }
-      groupedByFile.get(chunk.filePath)!.push(chunk);
+      groupedByFile.get(chunk.relativeFilePath)!.push(chunk);
     }
 
     let added = 0;

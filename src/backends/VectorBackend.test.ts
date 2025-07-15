@@ -31,6 +31,12 @@ const mockVectorRepository = {
   deleteVectors: vi.fn() as MockedFunction<
     (collectionName: string, pointIds: string[]) => Promise<void>
   >,
+  deleteVectorsByFilePath: vi.fn() as MockedFunction<
+    (collectionName: string, relativeFilePath: string) => Promise<void>
+  >,
+  deleteVectorsByNovelId: vi.fn() as MockedFunction<
+    (collectionName: string, novelId: string) => Promise<void>
+  >,
   deleteCollection: vi.fn() as MockedFunction<(collectionName: string) => Promise<void>>,
   getCollectionInfo: vi.fn() as MockedFunction<(collectionName: string) => Promise<CollectionInfo>>,
 } satisfies VectorRepository;
@@ -133,22 +139,22 @@ describe('VectorBackend', () => {
         'test-collection',
         expect.arrayContaining([
           expect.objectContaining({
-            id: expect.stringContaining('test/file1.txt'),
+            id: expect.any(String),
             vector: [0.1, 0.2, 0.3],
             payload: expect.objectContaining({
               title: 'タイトル1',
               content: 'コンテンツ1',
-              filePath: 'test/file1.txt',
+              relativeFilePath: 'test/file1.txt',
               novelId: 'test-novel',
             }),
           }),
           expect.objectContaining({
-            id: expect.stringContaining('test/file2.txt'),
+            id: expect.any(String),
             vector: [0.4, 0.5, 0.6],
             payload: expect.objectContaining({
               title: 'タイトル2',
               content: 'コンテンツ2',
-              filePath: 'test/file2.txt',
+              relativeFilePath: 'test/file2.txt',
               novelId: 'test-novel',
             }),
           }),
@@ -221,7 +227,7 @@ describe('VectorBackend', () => {
           payload: {
             title: 'タイトル1',
             content: 'これはテストコンテンツです。',
-            filePath: 'test/file1.txt',
+            relativeFilePath: 'test/file1.txt',
             startLine: 1,
             endLine: 5,
             novelId: 'test-novel',
@@ -233,7 +239,7 @@ describe('VectorBackend', () => {
           payload: {
             title: 'タイトル2',
             content: 'これもテストコンテンツです。',
-            filePath: 'test/file2.txt',
+            relativeFilePath: 'test/file2.txt',
             startLine: 6,
             endLine: 10,
             novelId: 'test-novel',
@@ -256,7 +262,7 @@ describe('VectorBackend', () => {
       expect(results).toHaveLength(2);
       expect(results[0]).toEqual(
         expect.objectContaining({
-          id: 'test-id-1',
+          id: expect.any(String),
           score: 0.9,
           snippet: expect.stringContaining('テストコンテンツ'),
           payload: expect.objectContaining({
@@ -281,7 +287,7 @@ describe('VectorBackend', () => {
           payload: {
             novelId: 'target-novel',
             content: 'テストコンテンツ',
-            filePath: 'test/file1.txt',
+            relativeFilePath: 'test/file1.txt',
             startLine: 1,
             endLine: 5,
           },
@@ -292,7 +298,7 @@ describe('VectorBackend', () => {
           payload: {
             novelId: 'other-novel',
             content: 'その他のコンテンツ',
-            filePath: 'test/file2.txt',
+            relativeFilePath: 'test/file2.txt',
             startLine: 6,
             endLine: 10,
           },

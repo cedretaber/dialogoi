@@ -82,7 +82,7 @@ export class KuromojiAnalyzer implements MorphAnalyzer {
             charOffset: wordPosition,
             chunkInfo: {
               chunkId: chunk.id,
-              filePath: chunk.filePath,
+              filePath: chunk.relativeFilePath,
               startLine: chunk.startLine,
               endLine: chunk.endLine,
               chunkIndex: chunk.chunkIndex,
@@ -139,7 +139,7 @@ export class KuromojiAnalyzer implements MorphAnalyzer {
         charOffset: wordPosition,
         chunkInfo: {
           chunkId: chunk.id,
-          filePath: chunk.filePath,
+          filePath: chunk.relativeFilePath,
           startLine: chunk.startLine,
           endLine: chunk.endLine,
           chunkIndex: chunk.chunkIndex,

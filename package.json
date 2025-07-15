@@ -17,7 +17,10 @@
     "typecheck": "tsc --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "ci": "rm -rf node_modules package-lock.json && npm install"
+    "ci": "rm -rf node_modules package-lock.json && npm install",
+    "test:vector": "tsx scripts/test-vector-backend.ts",
+    "setup:qdrant": "./scripts/setup-test-qdrant.sh",
+    "cleanup:qdrant": "./scripts/cleanup-test-qdrant.sh"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.6.3",

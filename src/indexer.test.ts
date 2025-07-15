@@ -111,7 +111,7 @@ describe('Indexer', () => {
       expect(chunks.length).toBeGreaterThan(0);
       expect(chunks[0]).toHaveProperty('id');
       expect(chunks[0]).toHaveProperty('content');
-      expect(chunks[0].filePath).toBe('test.md');
+      expect(chunks[0].relativeFilePath).toBe('test.md');
     });
   });
 

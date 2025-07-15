@@ -119,7 +119,7 @@ describe('MarkdownChunkingStrategy', () => {
       expect(chunks).toHaveLength(1);
       expect(chunks[0].content).toBe(text);
       expect(chunks[0].title).toBe('Document');
-      expect(chunks[0].filePath).toBe(filePath);
+      expect(chunks[0].relativeFilePath).toBe(filePath);
       expect(chunks[0].startLine).toBe(0);
     });
 
@@ -279,7 +279,7 @@ Line 3`;
       expect(chunks).toHaveLength(1);
 
       const chunk = chunks[0];
-      expect(chunk.filePath).toBe('test.md');
+      expect(chunk.relativeFilePath).toBe('test.md');
       expect(chunk.startLine).toBe(0);
       expect(chunk.endLine).toBe(2);
     });
@@ -361,7 +361,7 @@ And so ends our tale, but the adventure continues...`;
       expect(chunk.id).toBeTruthy();
       expect(chunk.title).toBeTruthy();
       expect(chunk.content).toBeTruthy();
-      expect(chunk.filePath).toBe('novel.md');
+      expect(chunk.relativeFilePath).toBe('novel.md');
       expect(chunk.startLine).toBeGreaterThanOrEqual(0);
       expect(chunk.endLine).toBeGreaterThanOrEqual(chunk.startLine);
     }

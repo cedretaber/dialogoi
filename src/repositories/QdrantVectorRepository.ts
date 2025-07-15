@@ -1,6 +1,7 @@
 import { QdrantClient, type Schemas } from '@qdrant/js-client-rest';
 import { getLogger } from '../logging/index.js';
 import { DialogoiError } from '../errors/index.js';
+import { generatePointId } from '../lib/idUtils.js';
 import type {
   VectorRepository,
   VectorPoint,
@@ -131,9 +132,13 @@ export class QdrantVectorRepository implements VectorRepository {
 
       // VectorPointをQdrantのPointStruct形式に変換
       const points: Schemas['PointStruct'][] = vectors.map((vector) => ({
-        id: vector.id,
+        id: generatePointId(vector.id),
         vector: vector.vector,
-        payload: vector.payload,
+        payload: {
+          ...vector.payload,
+          originalId: vector.id, // 元のIDを保持
+          relativeFilePath: vector.payload?.relativeFilePath, // 検索用のキーとして明示的に設定
+        },
       }));
 
       await this.client.upsert(collectionName, {
@@ -189,7 +194,7 @@ export class QdrantVectorRepository implements VectorRepository {
 
       // QdrantのScoredPointをVectorSearchResultに変換
       return searchResult.map((point) => ({
-        id: point.id.toString(),
+        id: (point.payload?.originalId as string) || point.id.toString(), // 元のIDを復元
         score: point.score,
         payload: point.payload || undefined,
         vector:
@@ -202,6 +207,93 @@ export class QdrantVectorRepository implements VectorRepository {
       throw new QdrantSearchError(
         `Failed to search in collection ${collectionName}: ${(error as Error).message}`,
         collectionName,
+        error as Error,
+      );
+    }
+  }
+
+  /**
+   * ファイルパスによるベクトルポイントの削除
+   * @param relativeFilePath プロジェクトルートからの相対パス
+   */
+  async deleteVectorsByFilePath(collectionName: string, relativeFilePath: string): Promise<void> {
+    await this.connect();
+
+    try {
+      logger.debug(`Deleting vectors by file path from collection: ${collectionName}`, {
+        relativeFilePath,
+      });
+      const startTime = Date.now();
+
+      // payloadのrelativeFilePathでフィルタリングして削除
+      await this.client.delete(collectionName, {
+        wait: true,
+        filter: {
+          must: [
+            {
+              key: 'relativeFilePath',
+              match: { value: relativeFilePath },
+            },
+          ],
+        },
+      });
+
+      const deleteTime = Date.now() - startTime;
+      logger.info(`Deleted vectors by file path in ${deleteTime}ms`, {
+        collection: collectionName,
+        relativeFilePath,
+      });
+    } catch (error) {
+      logger.error(
+        `Failed to delete vectors by file path from collection: ${collectionName}`,
+        error as Error,
+      );
+      throw new QdrantDeleteError(
+        `Failed to delete vectors by file path from ${collectionName}: ${(error as Error).message}`,
+        collectionName,
+        0, // 削除数は不明
+        error as Error,
+      );
+    }
+  }
+
+  /**
+   * 小説IDによるベクトルポイントの削除
+   */
+  async deleteVectorsByNovelId(collectionName: string, novelId: string): Promise<void> {
+    await this.connect();
+
+    try {
+      logger.debug(`Deleting vectors by novel ID from collection: ${collectionName}`, { novelId });
+      const startTime = Date.now();
+
+      // payloadのnovelIdでフィルタリングして削除
+      await this.client.delete(collectionName, {
+        wait: true,
+        filter: {
+          must: [
+            {
+              key: 'novelId',
+              match: { value: novelId },
+            },
+          ],
+        },
+      });
+
+      const deleteTime = Date.now() - startTime;
+      logger.info(`Deleted vectors by novel ID in ${deleteTime}ms`, {
+        collection: collectionName,
+        novelId,
+      });
+    } catch (error) {
+      logger.error(
+        `Failed to delete vectors by novel ID from collection: ${collectionName}`,
+        error as Error,
+      );
+      throw new QdrantDeleteError(
+        `Failed to delete vectors by novel ID from ${collectionName}: ${(error as Error).message}`,
+        collectionName,
+        0, // 削除数は不明
         error as Error,
       );
     }
@@ -222,9 +314,12 @@ export class QdrantVectorRepository implements VectorRepository {
       logger.debug(`Deleting ${pointIds.length} vectors from collection: ${collectionName}`);
       const startTime = Date.now();
 
+      // 文字列IDをUUIDに変換
+      const qdrantPointIds = pointIds.map((id) => generatePointId(id));
+
       await this.client.delete(collectionName, {
         wait: true, // 操作の完了を待つ
-        points: pointIds,
+        points: qdrantPointIds,
       });
 
       const deleteTime = Date.now() - startTime;
