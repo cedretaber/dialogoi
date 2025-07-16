@@ -296,6 +296,60 @@ describe('QdrantVectorRepository', () => {
       ]);
     });
 
+    it('フィルタが正常に適用される', async () => {
+      const mockResults: Schemas['ScoredPoint'][] = [
+        {
+          id: 'point1',
+          version: 1,
+          score: 0.95,
+          payload: { text: 'フィルタされたテキスト1', novelId: 'novel1' },
+        },
+      ];
+
+      mockQdrantClient.search.mockResolvedValue(mockResults);
+
+      const queryVector = [0.1, 0.2, 0.3];
+      const filter = {
+        must: [
+          {
+            key: 'novelId',
+            match: { value: 'novel1' },
+          },
+        ],
+      };
+
+      const results = await repository.searchVectors(
+        'test-collection',
+        queryVector,
+        10,
+        0.8,
+        filter,
+      );
+
+      expect(mockQdrantClient.search).toHaveBeenCalledWith('test-collection', {
+        vector: queryVector,
+        limit: 10,
+        score_threshold: 0.8,
+        with_payload: true,
+        filter: {
+          must: [
+            {
+              key: 'novelId',
+              match: { value: 'novel1' },
+            },
+          ],
+        },
+      });
+      expect(results).toEqual([
+        {
+          id: 'point1',
+          score: 0.95,
+          payload: { text: 'フィルタされたテキスト1', novelId: 'novel1' },
+          vector: undefined,
+        },
+      ]);
+    });
+
     it('検索エラーが適切に処理される', async () => {
       mockQdrantClient.search.mockRejectedValue(new Error('Search failed'));
 

@@ -8,11 +8,65 @@ import type {
   VectorSearchResult,
   CollectionInfo,
   VectorRepositoryConfig,
+  VectorFilter,
 } from './VectorRepository.js';
 
 export type { VectorRepositoryConfig };
 
 const logger = getLogger();
+
+/**
+ * VectorFilterをQdrantのフィルタ形式に変換
+ */
+function convertToQdrantFilter(filter: VectorFilter): Schemas['Filter'] {
+  const qdrantFilter: Schemas['Filter'] = {};
+
+  if (filter.must && filter.must.length > 0) {
+    qdrantFilter.must = filter.must.map(convertCondition);
+  }
+
+  if (filter.should && filter.should.length > 0) {
+    qdrantFilter.should = filter.should.map(convertCondition);
+  }
+
+  if (filter.mustNot && filter.mustNot.length > 0) {
+    qdrantFilter.must_not = filter.mustNot.map(convertCondition);
+  }
+
+  return qdrantFilter;
+}
+
+/**
+ * VectorFilterConditionをQdrantのCondition形式に変換
+ */
+function convertCondition(
+  condition: import('./VectorRepository.js').VectorFilterCondition,
+): Schemas['Condition'] {
+  const { key, match } = condition;
+
+  if (match.value !== undefined) {
+    return {
+      key,
+      match: { value: match.value },
+    };
+  }
+
+  if (match.anyOf !== undefined) {
+    return {
+      key,
+      match: { any: match.anyOf },
+    };
+  }
+
+  if (match.range !== undefined) {
+    return {
+      key,
+      range: match.range,
+    };
+  }
+
+  throw new Error(`Invalid filter condition: ${JSON.stringify(condition)}`);
+}
 
 /**
  * Qdrantベクトルデータベースリポジトリ
@@ -211,6 +265,7 @@ export class QdrantVectorRepository implements VectorRepository {
     queryVector: number[],
     limit: number,
     scoreThreshold?: number,
+    filter?: VectorFilter,
   ): Promise<VectorSearchResult[]> {
     await this.connect();
 
@@ -218,12 +273,19 @@ export class QdrantVectorRepository implements VectorRepository {
       logger.debug(`Searching in collection: ${collectionName}`);
       const startTime = Date.now();
 
-      const searchResult = await this.client.search(collectionName, {
+      const searchParams: Schemas['SearchRequest'] = {
         vector: queryVector,
         limit,
         score_threshold: scoreThreshold,
         with_payload: true, // メタデータも取得
-      });
+      };
+
+      // フィルタが指定されている場合は追加
+      if (filter) {
+        searchParams.filter = convertToQdrantFilter(filter);
+      }
+
+      const searchResult = await this.client.search(collectionName, searchParams);
 
       const searchTime = Date.now() - startTime;
       logger.debug(`Search completed in ${searchTime}ms`, {

@@ -79,7 +79,7 @@ describe('Indexer', () => {
     };
 
     // FileSystemNovelRepositoryのモックを設定
-    vi.mocked(FileSystemNovelRepository).mockImplementation(() => mockNovelRepository);
+    vi.mocked(FileSystemNovelRepository).mockImplementation(() => mockNovelRepository as any);
 
     indexer = new Indexer(mockConfig);
   });
@@ -248,6 +248,7 @@ describe('Indexer', () => {
         'test query',
         mockConfig.search.defaultK,
         'test-novel-id',
+        undefined,
       );
       expect(results).toEqual(mockResults);
     });
@@ -260,7 +261,7 @@ describe('Indexer', () => {
 
       await indexer.search('test query', 20, 'test-novel-id');
 
-      expect(mockBackend.search).toHaveBeenCalledWith('test query', 20, 'test-novel-id');
+      expect(mockBackend.search).toHaveBeenCalledWith('test query', 20, 'test-novel-id', undefined);
     });
   });
 

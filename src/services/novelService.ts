@@ -28,10 +28,11 @@ export class NovelService {
    * @param novelId 小説ID
    * @param query 検索クエリ
    * @param k 取得する結果数
+   * @param fileType ファイルタイプフィルタ ("content" | "settings" | "both")
    * @returns 検索結果
    */
-  async searchRag(novelId: string, query: string, k: number) {
-    return this.searchService.searchRag(novelId, query, { k });
+  async searchRag(novelId: string, query: string, k: number, fileType?: string) {
+    return this.searchService.searchRag(novelId, query, { k, fileType });
   }
 
   /**

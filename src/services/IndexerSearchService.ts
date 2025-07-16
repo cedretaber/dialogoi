@@ -40,8 +40,9 @@ export class IndexerSearchService implements SearchService {
     }
 
     const k = options?.k || 10;
-    this.logger.debug('RAG検索実行', { projectId, query, k });
-    return this.indexerManager.search(projectId, query, k);
+    const fileType = options?.fileType;
+    this.logger.debug('RAG検索実行', { projectId, query, k, fileType });
+    return this.indexerManager.search(projectId, query, k, fileType);
   }
 
   async searchSettingsFiles(

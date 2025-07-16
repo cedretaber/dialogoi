@@ -501,21 +501,21 @@ payload: {
 - [x] `VectorBackend.add`でpayloadに`fileType`を含める
 - [x] `QdrantVectorRepository`でpayloadインデックスを設定
 
-#### Phase 4-3: 事前フィルタリングの実装（優先度：高）
+#### Phase 4-3: 事前フィルタリングの実装（優先度：高）✅ **完了**
 
 **TODO**:
 
-- [ ] `VectorRepository.searchVectors`にfilterパラメータを追加
-- [ ] `VectorBackend.search`でQdrant側フィルタリングを実装
-- [ ] アプリケーションレベルフィルタリングの削除
+- [x] `VectorRepository.searchVectors`にfilterパラメータを追加
+- [x] `VectorBackend.search`でQdrant側フィルタリングを実装
+- [x] アプリケーションレベルフィルタリングの削除
 
-#### Phase 4-4: ファイルタイプ別検索機能（優先度：中）
+#### Phase 4-4: ファイルタイプ別検索機能（優先度：中）✅ **完了**
 
 **TODO**:
 
-- [ ] `search_rag` MCPツールに`fileType`パラメータを追加
-- [ ] "content", "settings", "both"の選択肢を実装
-- [ ] 適切なエラーハンドリングとバリデーション
+- [x] `search_rag` MCPツールに`fileType`パラメータを追加
+- [x] "content", "settings", "both"の選択肢を実装
+- [x] 適切なエラーハンドリングとバリデーション
 
 #### Phase 4-5: テストとドキュメント更新（優先度：低）
 
@@ -531,18 +531,22 @@ payload: {
 
 - Phase 4-1: NovelRepositoryベースのファイル検索ロジック実装完了
 - Phase 4-2: ChunkクラスへのfileTypeプロパティ追加とpayloadインデックス設定完了
+- Phase 4-3: 事前フィルタリングの実装完了
+- Phase 4-4: ファイルタイプ別検索機能の実装完了
 
 **現在の状況**:
 
-- 基本機能の実装は完了
-- 一部テストが失敗中（indexer.test.ts）- NovelRepositoryモックの設定が必要
-- 次の段階: Phase 4-3の事前フィルタリング実装
+- Phase 4の主要機能はすべて実装完了
+- 全テスト（228テスト）が通過
+- lint、typecheck、formatすべてクリア
+- 次の段階: Phase 4-5のテストとドキュメント更新（必要に応じて）
 
-**申し送り事項**:
+**実装の成果**:
 
-- `src/indexer.test.ts`のテストを修正する必要がある
-- NovelRepositoryのモックを適切に設定し、新しいファイル検索ロジックに対応したテストケースに更新
-- ChunkクラスのコンストラクタにfileTypeパラメータが追加されたため、他のテストファイルでも同様の修正が必要
+- RAG検索で適切なファイルのみがインデックス化されるように改善
+- Qdrantのpayloadインデックスによる検索性能の向上
+- `search_rag`ツールでファイルタイプ別検索が可能に（content/settings/both）
+- アプリケーションレベルフィルタリングの削除による効率化
 
 ### 8.4 実装詳細
 

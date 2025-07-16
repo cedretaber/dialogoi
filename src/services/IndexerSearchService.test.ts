@@ -75,7 +75,12 @@ describe('IndexerSearchService', () => {
 
       const results = await searchService.searchRag('test-novel', 'テストクエリ', { k: 5 });
 
-      expect(mockIndexerManager.search).toHaveBeenCalledWith('test-novel', 'テストクエリ', 5);
+      expect(mockIndexerManager.search).toHaveBeenCalledWith(
+        'test-novel',
+        'テストクエリ',
+        5,
+        undefined,
+      );
       expect(results).toEqual(mockResults);
     });
 
@@ -84,7 +89,12 @@ describe('IndexerSearchService', () => {
 
       await searchService.searchRag('test-novel', 'テストクエリ');
 
-      expect(mockIndexerManager.search).toHaveBeenCalledWith('test-novel', 'テストクエリ', 10);
+      expect(mockIndexerManager.search).toHaveBeenCalledWith(
+        'test-novel',
+        'テストクエリ',
+        10,
+        undefined,
+      );
     });
 
     it('IndexerManagerが設定されていない場合はエラーを投げる', async () => {

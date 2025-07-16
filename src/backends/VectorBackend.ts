@@ -1,5 +1,9 @@
 import { SearchBackend, SearchResult, Chunk } from './SearchBackend.js';
-import type { VectorRepository, VectorPoint } from '../repositories/VectorRepository.js';
+import type {
+  VectorRepository,
+  VectorPoint,
+  VectorFilter,
+} from '../repositories/VectorRepository.js';
 import type { EmbeddingService } from '../services/EmbeddingService.js';
 import { getLogger } from '../logging/index.js';
 import { DialogoiError } from '../errors/index.js';
@@ -240,27 +244,48 @@ export class VectorBackend extends SearchBackend {
   /**
    * ベクトル検索を実行
    */
-  async search(query: string, k: number, novelId: string): Promise<SearchResult[]> {
+  async search(
+    query: string,
+    k: number,
+    novelId: string,
+    fileType?: string,
+  ): Promise<SearchResult[]> {
     try {
-      logger.debug(`Performing vector search`, { query, k, novelId });
+      logger.debug(`Performing vector search`, { query, k, novelId, fileType });
       const startTime = Date.now();
 
       // クエリのembeddingを生成
       const queryEmbedding = await this.embeddingService.generateEmbedding(query);
 
-      // ベクトル検索を実行
+      // Qdrant側フィルタリング用のfilterを構築
+      const filter: VectorFilter = {
+        must: [
+          {
+            key: 'novelId',
+            match: { value: novelId },
+          },
+        ],
+      };
+
+      // fileTypeフィルタリングを追加
+      if (fileType && fileType !== 'both') {
+        filter.must!.push({
+          key: 'fileType',
+          match: { value: fileType },
+        });
+      }
+
+      // ベクトル検索を実行（Qdrant側でフィルタリング）
       const vectorResults = await this.vectorRepository.searchVectors(
         this.config.collectionName,
         queryEmbedding,
         k,
         this.config.scoreThreshold,
+        filter,
       );
 
-      // 結果をフィルタリング（指定された小説IDのみ）
-      const filteredResults = vectorResults.filter((result) => result.payload?.novelId === novelId);
-
       // SearchResult形式に変換
-      const searchResults = filteredResults.map((result) => {
+      const searchResults = vectorResults.map((result) => {
         const payload = result.payload;
         const snippet = this.generateSnippet(
           payload?.content as string,
@@ -286,6 +311,7 @@ export class VectorBackend extends SearchBackend {
         query,
         resultCount: searchResults.length,
         k,
+        fileType,
       });
 
       return searchResults;

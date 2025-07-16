@@ -100,11 +100,22 @@ export class IndexerManager {
    * @param k 取得する結果数
    * @returns 検索結果
    */
-  async search(novelId: string, query: string, k: number): Promise<SearchResult[]> {
+  async search(
+    novelId: string,
+    query: string,
+    k: number,
+    fileType?: string,
+  ): Promise<SearchResult[]> {
+    // fileTypeのバリデーション
+    if (fileType && !['content', 'settings', 'both'].includes(fileType)) {
+      throw new Error(`Invalid fileType: ${fileType}. Must be one of: content, settings, both`);
+    }
+
     this.logger.debug('RAG検索開始', {
       novelId,
       query,
       k,
+      fileType,
       hasInitializationResult: !!this.initializationResult,
       initializationResultSuccess: this.initializationResult?.success,
     });
@@ -165,7 +176,7 @@ export class IndexerManager {
     }
 
     await this.ensureNovelInitialized(novelId);
-    return this.indexer.search(query, k, novelId);
+    return this.indexer.search(query, k, novelId, fileType);
   }
 
   /**

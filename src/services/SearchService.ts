@@ -8,6 +8,8 @@ export interface SearchOptions {
   k?: number;
   /** 正規表現を使用するか */
   useRegex?: boolean;
+  /** ファイルタイプフィルタ ("content" | "settings" | "both") */
+  fileType?: string;
 }
 
 /**

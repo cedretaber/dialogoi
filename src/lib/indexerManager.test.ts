@@ -139,7 +139,7 @@ describe('IndexerManager', () => {
       const results = await indexerManager.search('novel-1', 'test query', 10);
 
       expect(mockIndexer.indexNovel).toHaveBeenCalledWith('novel-1');
-      expect(mockIndexer.search).toHaveBeenCalledWith('test query', 10, 'novel-1');
+      expect(mockIndexer.search).toHaveBeenCalledWith('test query', 10, 'novel-1', undefined);
       expect(results).toEqual(mockResults);
     });
 

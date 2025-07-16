@@ -274,6 +274,12 @@ const searchRagInput = z.object({
   novelId: z.string().describe('小説のID'),
   query: z.string().describe('検索クエリ（自然言語）'),
   k: z.number().int().min(1).max(50).optional().describe('返す結果の最大数（デフォルト: 10）'),
+  fileType: z
+    .enum(['content', 'settings', 'both'])
+    .optional()
+    .describe(
+      '検索対象のファイルタイプ (content: 本文, settings: 設定, both: 両方) (デフォルト: both)',
+    ),
 });
 
 // 小説プロジェクト一覧を取得するツール
@@ -492,19 +498,30 @@ server.registerTool(
       'プロジェクト全体から関連テキストチャンクを検索します（RAG検索）。自然言語クエリでタイトル・本文・タグを横断検索し、LLMプロンプトに最適化されたMarkdown形式で結果を返します。',
     inputSchema: searchRagInput.shape,
   },
-  async (params: { novelId: string; query: string; k?: number }) => {
+  async (params: {
+    novelId: string;
+    query: string;
+    k?: number;
+    fileType?: 'content' | 'settings' | 'both';
+  }) => {
     try {
       const k = params.k || dialogoiConfig.search.defaultK;
       const maxK = dialogoiConfig.search.maxK;
 
       // k値を制限内に収める
       const limitedK = Math.min(k, maxK);
+      const fileType = params.fileType || 'both';
 
       console.error(
-        `🔍 RAG検索実行: novelId="${params.novelId}", query="${params.query}", k=${limitedK}`,
+        `🔍 RAG検索実行: novelId="${params.novelId}", query="${params.query}", k=${limitedK}, fileType=${fileType}`,
       );
 
-      const searchResults = await novelService.searchRag(params.novelId, params.query, limitedK);
+      const searchResults = await novelService.searchRag(
+        params.novelId,
+        params.query,
+        limitedK,
+        fileType,
+      );
 
       if (searchResults.length === 0) {
         return {

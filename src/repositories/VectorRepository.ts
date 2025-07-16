@@ -36,6 +36,7 @@ export interface VectorRepository {
     queryVector: number[],
     limit: number,
     scoreThreshold?: number,
+    filter?: VectorFilter,
   ): Promise<VectorSearchResult[]>;
 
   /**
@@ -63,6 +64,66 @@ export interface VectorRepository {
    * コレクション情報の取得
    */
   getCollectionInfo(collectionName: string): Promise<CollectionInfo>;
+}
+
+/**
+ * ベクトル検索フィルタ
+ */
+export interface VectorFilter {
+  /**
+   * AND条件（全ての条件が真である必要がある）
+   */
+  must?: VectorFilterCondition[];
+
+  /**
+   * OR条件（いずれかの条件が真である必要がある）
+   */
+  should?: VectorFilterCondition[];
+
+  /**
+   * NOT条件（条件が偽である必要がある）
+   */
+  mustNot?: VectorFilterCondition[];
+}
+
+/**
+ * ベクトル検索フィルタ条件
+ */
+export interface VectorFilterCondition {
+  /**
+   * フィルタリング対象のキー
+   */
+  key: string;
+
+  /**
+   * マッチング条件
+   */
+  match: VectorFilterMatch;
+}
+
+/**
+ * ベクトル検索フィルタマッチング条件
+ */
+export interface VectorFilterMatch {
+  /**
+   * 完全一致
+   */
+  value?: string | number | boolean;
+
+  /**
+   * 複数値のうちいずれかと一致
+   */
+  anyOf?: (string | number | boolean)[];
+
+  /**
+   * 範囲指定
+   */
+  range?: {
+    gte?: number;
+    gt?: number;
+    lte?: number;
+    lt?: number;
+  };
 }
 
 /**

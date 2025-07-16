@@ -290,10 +290,15 @@ export class Indexer {
   /**
    * 検索機能をバックエンドに委譲
    */
-  async search(query: string, k: number = this.config.search.defaultK, novelId: string) {
+  async search(
+    query: string,
+    k: number = this.config.search.defaultK,
+    novelId: string,
+    fileType?: string,
+  ) {
     // VectorBackend を初期化
     await this.backend.initialize();
-    return this.backend.search(query, k, novelId);
+    return this.backend.search(query, k, novelId, fileType);
   }
 
   /**

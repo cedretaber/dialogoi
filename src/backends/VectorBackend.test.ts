@@ -26,6 +26,7 @@ const mockVectorRepository = {
       queryVector: number[],
       limit: number,
       scoreThreshold?: number,
+      filter?: import('../repositories/VectorRepository.js').VectorFilter,
     ) => Promise<VectorSearchResult[]>
   >,
   deleteVectors: vi.fn() as MockedFunction<
@@ -270,6 +271,14 @@ describe('VectorBackend', () => {
         mockQueryEmbedding,
         k,
         0.7,
+        {
+          must: [
+            {
+              key: 'novelId',
+              match: { value: novelId },
+            },
+          ],
+        },
       );
       expect(results).toHaveLength(2);
       expect(results[0]).toEqual(
@@ -292,6 +301,7 @@ describe('VectorBackend', () => {
       const novelId = 'target-novel';
 
       const mockQueryEmbedding = [0.1, 0.2, 0.3];
+      // QdrantRepositoryがフィルタリングした結果を返すことを想定
       const mockVectorResults: VectorSearchResult[] = [
         {
           id: 'test-id-1',
@@ -304,15 +314,143 @@ describe('VectorBackend', () => {
             endLine: 5,
           },
         },
+      ];
+
+      mockEmbeddingService.generateEmbedding.mockResolvedValue(mockQueryEmbedding);
+      mockVectorRepository.searchVectors.mockResolvedValue(mockVectorResults);
+
+      const results = await vectorBackend.search(query, k, novelId);
+
+      // searchVectorsがフィルタと共に呼ばれることを確認
+      expect(mockVectorRepository.searchVectors).toHaveBeenCalledWith(
+        'test-collection',
+        mockQueryEmbedding,
+        k,
+        0.7,
         {
-          id: 'test-id-2',
-          score: 0.8,
+          must: [
+            {
+              key: 'novelId',
+              match: { value: novelId },
+            },
+          ],
+        },
+      );
+
+      expect(results).toHaveLength(1);
+      expect(results[0].payload.file).toBe('test/file1.txt');
+    });
+
+    it('fileTypeフィルタが正しく適用される', async () => {
+      const query = 'テスト検索';
+      const k = 5;
+      const novelId = 'test-novel';
+      const fileType = 'content';
+
+      const mockQueryEmbedding = [0.1, 0.2, 0.3];
+      const mockVectorResults: VectorSearchResult[] = [
+        {
+          id: 'test-id-1',
+          score: 0.9,
           payload: {
-            novelId: 'other-novel',
-            content: 'その他のコンテンツ',
-            relativeFilePath: 'test/file2.txt',
-            startLine: 6,
-            endLine: 10,
+            novelId: 'test-novel',
+            fileType: 'content',
+            content: 'テストコンテンツ',
+            relativeFilePath: 'test/file1.txt',
+            startLine: 1,
+            endLine: 5,
+          },
+        },
+      ];
+
+      mockEmbeddingService.generateEmbedding.mockResolvedValue(mockQueryEmbedding);
+      mockVectorRepository.searchVectors.mockResolvedValue(mockVectorResults);
+
+      const results = await vectorBackend.search(query, k, novelId, fileType);
+
+      expect(mockVectorRepository.searchVectors).toHaveBeenCalledWith(
+        'test-collection',
+        mockQueryEmbedding,
+        k,
+        0.7,
+        {
+          must: [
+            {
+              key: 'novelId',
+              match: { value: novelId },
+            },
+            {
+              key: 'fileType',
+              match: { value: fileType },
+            },
+          ],
+        },
+      );
+
+      expect(results).toHaveLength(1);
+      expect(results[0].payload.file).toBe('test/file1.txt');
+    });
+
+    it('fileType="both"の場合はfileTypeフィルタが追加されない', async () => {
+      const query = 'テスト検索';
+      const k = 5;
+      const novelId = 'test-novel';
+      const fileType = 'both';
+
+      const mockQueryEmbedding = [0.1, 0.2, 0.3];
+      const mockVectorResults: VectorSearchResult[] = [
+        {
+          id: 'test-id-1',
+          score: 0.9,
+          payload: {
+            novelId: 'test-novel',
+            content: 'テストコンテンツ',
+            relativeFilePath: 'test/file1.txt',
+            startLine: 1,
+            endLine: 5,
+          },
+        },
+      ];
+
+      mockEmbeddingService.generateEmbedding.mockResolvedValue(mockQueryEmbedding);
+      mockVectorRepository.searchVectors.mockResolvedValue(mockVectorResults);
+
+      const results = await vectorBackend.search(query, k, novelId, fileType);
+
+      expect(mockVectorRepository.searchVectors).toHaveBeenCalledWith(
+        'test-collection',
+        mockQueryEmbedding,
+        k,
+        0.7,
+        {
+          must: [
+            {
+              key: 'novelId',
+              match: { value: novelId },
+            },
+          ],
+        },
+      );
+
+      expect(results).toHaveLength(1);
+    });
+
+    it('fileTypeが未指定の場合はfileTypeフィルタが追加されない', async () => {
+      const query = 'テスト検索';
+      const k = 5;
+      const novelId = 'test-novel';
+
+      const mockQueryEmbedding = [0.1, 0.2, 0.3];
+      const mockVectorResults: VectorSearchResult[] = [
+        {
+          id: 'test-id-1',
+          score: 0.9,
+          payload: {
+            novelId: 'test-novel',
+            content: 'テストコンテンツ',
+            relativeFilePath: 'test/file1.txt',
+            startLine: 1,
+            endLine: 5,
           },
         },
       ];
@@ -322,8 +460,22 @@ describe('VectorBackend', () => {
 
       const results = await vectorBackend.search(query, k, novelId);
 
+      expect(mockVectorRepository.searchVectors).toHaveBeenCalledWith(
+        'test-collection',
+        mockQueryEmbedding,
+        k,
+        0.7,
+        {
+          must: [
+            {
+              key: 'novelId',
+              match: { value: novelId },
+            },
+          ],
+        },
+      );
+
       expect(results).toHaveLength(1);
-      expect(results[0].payload.file).toBe('test/file1.txt');
     });
 
     it('検索エラーが適切に処理される', async () => {
