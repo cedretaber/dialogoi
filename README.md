@@ -295,12 +295,18 @@ node dist/index.js --project-root ./my-novels --max-tokens 600 --docker-enabled 
 - `novelId`: 小説のID
 - `query`: 検索クエリ（自然言語）
 - `k`: 取得する結果数（省略時: 10、最大: 50）
+- `fileType`: 検索対象のファイルタイプ（`content`, `settings`, `both`）（省略時: `both`）
 
-**使用例:** "主人公が魔法を使うシーン"
+**使用例:**
+- "主人公が魔法を使うシーン" (全体検索)
+- "設定ファイルから魔法システムについて調べて" (`fileType: "settings"`)
+- "本文から感情表現を探して" (`fileType: "content"`)
 
 **RAG検索の特徴:**
 
 - **ベクトル検索**: multilingual-e5-small モデルによる意味的類似度検索
+- **ファイルタイプ別検索**: 本文・設定・両方を選択可能
+- **Qdrant側フィルタリング**: 高速な事前フィルタリング
 - **スマートチャンキング**: 20%オーバーラップで文脈を保持
 - **高精度検索**: 384次元ベクトルによる意味理解
 - **コンテキスト表示**: マッチ箇所の前後最大120文字を抽出
@@ -495,6 +501,7 @@ npm run format      # Prettier フォーマット
 - ✅ Phase 1完了（統一エラーハンドリング・ロギング・型安全性向上）
 - ✅ Phase 2完了（Repositoryパターン・検索サービス分離・依存性注入）
 - ✅ Phase 3完了（Qdrant統合・ベクトル検索・FlexSearch廃止・Docker自動起動）
+- ✅ Phase 4完了（RAG検索最適化・ファイルタイプ別検索・Qdrant側フィルタリング）
 
 全体進捗: 100% 🎉
 

@@ -495,7 +495,7 @@ server.registerTool(
   'search_rag',
   {
     description:
-      'プロジェクト全体から関連テキストチャンクを検索します（RAG検索）。自然言語クエリでタイトル・本文・タグを横断検索し、LLMプロンプトに最適化されたMarkdown形式で結果を返します。',
+      'プロジェクト全体から関連テキストチャンクを検索します（RAG検索）。multilingual-e5-smallモデルによる意味的類似度検索で、自然言語クエリから関連コンテンツを発見します。ファイルタイプ別フィルタリング（本文/設定/両方）、Qdrant側フィルタリングによる高速検索、LLMプロンプトに最適化されたMarkdown形式での結果出力を提供します。',
     inputSchema: searchRagInput.shape,
   },
   async (params: {
