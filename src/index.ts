@@ -576,65 +576,44 @@ const executeInitialization = async (): Promise<void> => {
 
   // Step 1: 検索バックエンドを初期化
   console.error('🔍 検索バックエンドの初期化を開始します...');
+  const initStartTime = Date.now();
   try {
     await novelService.initialize();
-    console.error('✅ 検索バックエンドの初期化が完了しました');
+    const initDuration = Date.now() - initStartTime;
+    console.error(`✅ 検索バックエンドの初期化が完了しました（${initDuration}ms）`);
   } catch (error) {
+    const initDuration = Date.now() - initStartTime;
     console.error(
-      '⚠️  検索バックエンドの初期化でエラーが発生しましたが、サーバーを継続します:',
+      `⚠️  検索バックエンドの初期化でエラーが発生しましたが、サーバーを継続します（${initDuration}ms）:`,
       error,
     );
   }
 
   // Step 2: ファイル監視を開始（検索バックエンド初期化後）
   console.error('🔍 ファイル監視を開始します...');
+  const watchStartTime = Date.now();
   try {
     await novelService.startFileWatching();
-    console.error('🚀 ファイル監視が開始されました');
+    const watchDuration = Date.now() - watchStartTime;
+    console.error(`🚀 ファイル監視が開始されました（${watchDuration}ms）`);
   } catch (error) {
-    console.error('❌ ファイル監視の開始に失敗しました:', error);
+    const watchDuration = Date.now() - watchStartTime;
+    console.error(`❌ ファイル監視の開始に失敗しました（${watchDuration}ms）:`, error);
   }
-
-  console.error('✅ アプリケーションの初期化が完了しました');
 };
 
 // MCPサーバーの初期化ハンドラーを設定
 server.server.oninitialized = () => {
   console.error('🔧 MCPサーバーが初期化されました。アプリケーションの初期化を開始します...');
 
-  // 初期化完了フラグを設定
-  let initializationCompleted = false;
-  let initializationError: Error | null = null;
-
-  // 非同期初期化処理を実行
+  // 非同期初期化処理を実行（ブロッキングしない）
   executeInitialization()
     .then(() => {
-      initializationCompleted = true;
+      console.error('✅ アプリケーションの初期化が完了しました');
     })
     .catch((error) => {
-      initializationCompleted = true;
-      initializationError = error;
       console.error('❌ アプリケーションの初期化で予期しないエラーが発生しました:', error);
     });
-
-  // 同期的に初期化完了を待機（最大30秒）
-  const maxWaitTime = 30000; // 30秒
-  const checkInterval = 100; // 100ms間隔
-  const startTime = Date.now();
-
-  while (!initializationCompleted && Date.now() - startTime < maxWaitTime) {
-    // 100ms待機して再チェック（同期的なビジーウェイト）
-    const waitStart = Date.now();
-    while (Date.now() - waitStart < checkInterval) {
-      // 同期的な待機
-    }
-  }
-
-  if (!initializationCompleted) {
-    console.error('⚠️  アプリケーションの初期化がタイムアウトしました（30秒）');
-  } else if (initializationError) {
-    console.error('❌ アプリケーションの初期化でエラーが発生しました:', initializationError);
-  }
 };
 
 /**

@@ -201,7 +201,7 @@ export class DockerManager {
   async waitForContainerHealth(
     containerName: string,
     port: number,
-    timeoutMs: number = 30000,
+    timeoutMs: number = 15000,
   ): Promise<boolean> {
     const startTime = Date.now();
 

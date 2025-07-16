@@ -52,7 +52,20 @@ export class NovelService {
    * 検索バックエンドを初期化（サーバー起動時に呼び出し）
    */
   async initialize(): Promise<void> {
-    await this.searchService.initialize();
+    // タイムアウト付きで初期化を実行（最大10秒）
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('初期化がタイムアウトしました')), 10000);
+    });
+
+    try {
+      await Promise.race([this.searchService.initialize(), timeoutPromise]);
+    } catch (error) {
+      this.logger.error(
+        '初期化でエラーが発生しました:',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      // エラーが発生してもプロセスを継続（検索バックエンドがない状態で動作）
+    }
   }
 
   /**
