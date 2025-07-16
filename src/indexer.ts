@@ -79,6 +79,14 @@ export class Indexer {
     const content = await fs.readFile(filePath, 'utf-8');
     const relativePath = path.relative(this.projectRoot, filePath);
 
+    // 既存のチャンクを削除（前のデータをクリア）
+    try {
+      await this.backend.removeByFile(relativePath);
+    } catch (error) {
+      // 削除処理が失敗しても処理を続行（例：該当するチャンクがない場合）
+      console.error(`⚠️ 既存チャンクの削除に失敗しました（処理続行）: ${relativePath}`, error);
+    }
+
     // チャンキング実行
     const chunkData = this.chunkingStrategy.chunk(
       content,
@@ -133,13 +141,13 @@ export class Indexer {
       // VectorBackend を初期化
       await this.backend.initialize();
 
-      // 相対パスに変換して削除
-      const relativePath = path.relative(this.projectRoot, filePath);
-      await this.removeFileChunks(relativePath);
+      // processFile内で削除処理が実行されるため、ここでは削除は不要
+      // processFileメソッドが削除→追加の順序で実行される
 
-      // 新しいチャンクを追加
+      // 新しいチャンクを追加（削除処理も含む）
       await this.processFile(filePath, novelId);
 
+      const relativePath = path.relative(this.projectRoot, filePath);
       console.error(`🔄 ファイルを更新しました: ${relativePath}`);
     } catch (error) {
       console.error(`❌ ファイル更新エラー: ${filePath}`, error);
