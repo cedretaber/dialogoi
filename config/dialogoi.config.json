@@ -8,11 +8,33 @@
     "defaultK": 10,
     "maxK": 50
   },
+  "embedding": {
+    "enabled": true,
+    "model": "intfloat/multilingual-e5-small",
+    "dimensions": 384,
+    "batchSize": 32
+  },
+  "qdrant": {
+    "collection": "dialogoi-chunks",
+    "timeout": 5000,
+    "docker": {
+      "enabled": true,
+      "image": "qdrant/qdrant",
+      "timeout": 30000,
+      "autoCleanup": true
+    }
+  },
   "docker": {
     "qdrant": {
       "containerName": "dialogoi-qdrant",
       "image": "qdrant/qdrant",
       "port": 6333
     }
+  },
+  "vector": {
+    "collectionName": "dialogoi-chunks",
+    "scoreThreshold": 0.7,
+    "vectorDimensions": 384,
+    "snippetLength": 120
   }
 }
