@@ -528,15 +528,18 @@ payload: {
 ### 8.5 Phase 4 進捗状況（2025-01-16）
 
 **完了済み**:
+
 - Phase 4-1: NovelRepositoryベースのファイル検索ロジック実装完了
 - Phase 4-2: ChunkクラスへのfileTypeプロパティ追加とpayloadインデックス設定完了
 
 **現在の状況**:
+
 - 基本機能の実装は完了
 - 一部テストが失敗中（indexer.test.ts）- NovelRepositoryモックの設定が必要
 - 次の段階: Phase 4-3の事前フィルタリング実装
 
 **申し送り事項**:
+
 - `src/indexer.test.ts`のテストを修正する必要がある
 - NovelRepositoryのモックを適切に設定し、新しいファイル検索ロジックに対応したテストケースに更新
 - ChunkクラスのコンストラクタにfileTypeパラメータが追加されたため、他のテストファイルでも同様の修正が必要

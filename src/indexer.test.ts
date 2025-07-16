@@ -4,6 +4,7 @@ import type { Stats } from 'fs';
 import { Indexer } from './indexer.js';
 import { DialogoiConfig } from './lib/config.js';
 import { findFilesRecursively } from './utils/fileUtils.js';
+import { FileSystemNovelRepository } from './repositories/FileSystemNovelRepository.js';
 
 // モックの設定
 vi.mock('fs/promises');
@@ -11,10 +12,14 @@ vi.mock('./utils/fileUtils.js');
 vi.mock('./backends/VectorBackend.js');
 vi.mock('./services/TransformersEmbeddingService.js');
 vi.mock('./repositories/QdrantVectorRepository.js');
+vi.mock('./repositories/FileSystemNovelRepository.js');
 
 describe('Indexer', () => {
   let indexer: Indexer;
   let mockConfig: DialogoiConfig;
+  let mockNovelRepository: {
+    getProject: ReturnType<typeof vi.fn>;
+  };
   const testProjectRoot = '/test/project';
 
   beforeEach(() => {
@@ -62,6 +67,20 @@ describe('Indexer', () => {
       },
     };
 
+    // NovelRepositoryのモックを設定
+    mockNovelRepository = {
+      getProject: vi.fn().mockResolvedValue({
+        path: '/test/project/test-novel',
+        config: {
+          settingsDirectories: ['settings'],
+          contentDirectories: ['contents'],
+        },
+      }),
+    };
+
+    // FileSystemNovelRepositoryのモックを設定
+    vi.mocked(FileSystemNovelRepository).mockImplementation(() => mockNovelRepository);
+
     indexer = new Indexer(mockConfig);
   });
 
@@ -71,17 +90,22 @@ describe('Indexer', () => {
 
   describe('indexNovel', () => {
     it('特定の小説プロジェクトのファイルを走査してインデックスを構築する', async () => {
-      const mockFiles = [
-        '/test/project/test-novel/file1.md',
-        '/test/project/test-novel/file2.txt',
-        '/test/project/test-novel/nested/file3.md',
-      ];
-
       // fs.statモック（ディレクトリが存在することを示す）
       vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as Stats);
 
-      // findFilesRecursivelyモックの設定
-      vi.mocked(findFilesRecursively).mockResolvedValue(mockFiles);
+      // findFilesRecursivelyモックの設定（パスに応じて適切なファイルリストを返す）
+      vi.mocked(findFilesRecursively).mockImplementation(async (dirPath) => {
+        if (dirPath.includes('settings')) {
+          return ['/test/project/test-novel/settings/file1.md'];
+        }
+        if (dirPath.includes('contents')) {
+          return [
+            '/test/project/test-novel/contents/file2.txt',
+            '/test/project/test-novel/contents/nested/file3.md',
+          ];
+        }
+        return [];
+      });
 
       // ファイル読み込みのモック
       vi.mocked(fs.readFile).mockImplementation(async (filePath) => {
@@ -101,19 +125,26 @@ describe('Indexer', () => {
       expect(consoleSpy).toHaveBeenCalledWith(
         '🔍 小説プロジェクト "test-novel" のファイルを走査中...',
       );
-      expect(consoleSpy).toHaveBeenCalledWith('📄 3 個のファイルを発見');
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('📄 合計 3 個のファイルを発見'),
+      );
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('🎉 小説プロジェクト "test-novel" のインデックス構築完了'),
       );
     });
 
     it('ファイル処理中のエラーを適切にハンドリングする', async () => {
-      const mockFiles = ['/test/project/test-novel/error.md'];
-
       // fs.statモック（ディレクトリが存在することを示す）
       vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as Stats);
 
-      vi.mocked(findFilesRecursively).mockResolvedValue(mockFiles);
+      // findFilesRecursivelyモックの設定（パスに応じて適切なファイルリストを返す）
+      vi.mocked(findFilesRecursively).mockImplementation(async (dirPath) => {
+        if (dirPath.includes('contents')) {
+          return ['/test/project/test-novel/contents/error.md'];
+        }
+        return [];
+      });
+
       vi.mocked(fs.readFile).mockRejectedValueOnce(new Error('Read error'));
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
@@ -121,7 +152,7 @@ describe('Indexer', () => {
       await indexer.indexNovel('test-novel');
 
       expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('✗ test-novel/error.md: Error:'),
+        expect.stringContaining('✗ test-novel/contents/error.md: Error:'),
       );
     });
   });
@@ -241,39 +272,66 @@ describe('Indexer', () => {
 
   describe('findTargetFiles', () => {
     it('隠しディレクトリを除外する', async () => {
-      const mockFiles = [
-        '/test/project/file.md',
-        '/test/project/.cache/temp.md',
-        '/test/project/.git/config.md',
-        '/test/project/.hidden/secret.md',
-      ];
-
       // fs.statモック（ディレクトリが存在することを示す）
       vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as Stats);
 
-      vi.mocked(findFilesRecursively).mockResolvedValue([mockFiles[0]]);
+      // findFilesRecursivelyモックの設定（パスに応じて適切なファイルリストを返す）
+      vi.mocked(findFilesRecursively).mockImplementation(async (dirPath) => {
+        if (dirPath.includes('contents')) {
+          return ['/test/project/test-novel/contents/file.md'];
+        }
+        return [];
+      });
 
       const files = await (
-        indexer as unknown as { findTargetFiles: (novelId: string) => Promise<string[]> }
+        indexer as unknown as {
+          findTargetFiles: (
+            novelId: string,
+          ) => Promise<Array<{ filePath: string; fileType: string }>>;
+        }
       ).findTargetFiles('test-novel');
 
-      expect(files).toEqual(['/test/project/file.md']);
+      expect(files).toEqual([
+        {
+          filePath: '/test/project/test-novel/contents/file.md',
+          fileType: 'content',
+        },
+      ]);
     });
 
     it('見つかったファイルをソートする', async () => {
       // fs.statモック（ディレクトリが存在することを示す）
       vi.mocked(fs.stat).mockResolvedValue({ isDirectory: () => true } as Stats);
 
-      vi.mocked(findFilesRecursively).mockResolvedValue([
-        '/test/project/b.md',
-        '/test/project/a.md',
-      ]);
+      // findFilesRecursivelyモックの設定（パスに応じて適切なファイルリストを返す）
+      vi.mocked(findFilesRecursively).mockImplementation(async (dirPath) => {
+        if (dirPath.includes('contents')) {
+          return [
+            '/test/project/test-novel/contents/b.md',
+            '/test/project/test-novel/contents/a.md',
+          ];
+        }
+        return [];
+      });
 
       const files = await (
-        indexer as unknown as { findTargetFiles: (novelId: string) => Promise<string[]> }
+        indexer as unknown as {
+          findTargetFiles: (
+            novelId: string,
+          ) => Promise<Array<{ filePath: string; fileType: string }>>;
+        }
       ).findTargetFiles('test-novel');
 
-      expect(files).toEqual(['/test/project/a.md', '/test/project/b.md']);
+      expect(files).toEqual([
+        {
+          filePath: '/test/project/test-novel/contents/a.md',
+          fileType: 'content',
+        },
+        {
+          filePath: '/test/project/test-novel/contents/b.md',
+          fileType: 'content',
+        },
+      ]);
     });
   });
 });

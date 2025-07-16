@@ -117,8 +117,20 @@ describe('VectorBackend', () => {
   describe('add', () => {
     it('チャンクが正常に追加される', async () => {
       const chunks = [
-        new Chunk('タイトル1', 'コンテンツ1', 'test/file1.txt', 1, 5, 0, 'test-novel', ['tag1']),
-        new Chunk('タイトル2', 'コンテンツ2', 'test/file2.txt', 6, 10, 1, 'test-novel', ['tag2']),
+        new Chunk('タイトル1', 'コンテンツ1', 'test/file1.txt', 1, 5, 0, 'test-novel', 'content', [
+          'tag1',
+        ]),
+        new Chunk(
+          'タイトル2',
+          'コンテンツ2',
+          'test/file2.txt',
+          6,
+          10,
+          1,
+          'test-novel',
+          'settings',
+          ['tag2'],
+        ),
       ];
 
       const mockEmbeddings = [
@@ -171,7 +183,7 @@ describe('VectorBackend', () => {
 
     it('追加エラーが適切に処理される', async () => {
       const chunks = [
-        new Chunk('タイトル1', 'コンテンツ1', 'test/file1.txt', 1, 5, 0, 'test-novel'),
+        new Chunk('タイトル1', 'コンテンツ1', 'test/file1.txt', 1, 5, 0, 'test-novel', 'content'),
       ];
 
       mockEmbeddingService.generateBatchEmbeddings.mockRejectedValue(
@@ -187,7 +199,7 @@ describe('VectorBackend', () => {
   describe('updateChunks', () => {
     it('チャンクが正常に更新される', async () => {
       const chunks = [
-        new Chunk('タイトル1', 'コンテンツ1', 'test/file1.txt', 1, 5, 0, 'test-novel'),
+        new Chunk('タイトル1', 'コンテンツ1', 'test/file1.txt', 1, 5, 0, 'test-novel', 'content'),
       ];
 
       mockEmbeddingService.generateBatchEmbeddings.mockResolvedValue([[0.1, 0.2, 0.3]]);
