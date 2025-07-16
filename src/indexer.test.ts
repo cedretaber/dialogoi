@@ -79,7 +79,9 @@ describe('Indexer', () => {
     };
 
     // FileSystemNovelRepositoryのモックを設定
-    vi.mocked(FileSystemNovelRepository).mockImplementation(() => mockNovelRepository as any);
+    vi.mocked(FileSystemNovelRepository).mockImplementation(
+      () => mockNovelRepository as unknown as FileSystemNovelRepository,
+    );
 
     indexer = new Indexer(mockConfig);
   });
