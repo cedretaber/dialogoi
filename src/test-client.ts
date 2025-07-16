@@ -3,6 +3,10 @@
 // Node.jsのWeb Streams APIをグローバルに設定
 globalThis.TransformStream = (await import('node:stream/web')).TransformStream;
 
+import { getLogger } from './logging/index.js';
+
+const logger = getLogger();
+
 async function main() {
   const baseUrl = 'http://localhost:3000';
 
@@ -52,10 +56,12 @@ async function main() {
     const contentResult = await contentResponse.json();
     console.log('Content result:', contentResult);
   } catch (error) {
-    console.error('Error:', error);
+    logger.error('Error:', error instanceof Error ? error : undefined);
   }
 }
 
-main().catch(console.error);
+main().catch((error) => {
+  logger.error('Main function error:', error instanceof Error ? error : undefined);
+});
 
 export {};

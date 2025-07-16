@@ -5,6 +5,7 @@ import { Indexer } from './indexer.js';
 import { DialogoiConfig } from './lib/config.js';
 import { findFilesRecursively } from './utils/fileUtils.js';
 import { FileSystemNovelRepository } from './repositories/FileSystemNovelRepository.js';
+import { getLogger } from './logging/index.js';
 
 // モックの設定
 vi.mock('fs/promises');
@@ -13,6 +14,7 @@ vi.mock('./backends/VectorBackend.js');
 vi.mock('./services/TransformersEmbeddingService.js');
 vi.mock('./repositories/QdrantVectorRepository.js');
 vi.mock('./repositories/FileSystemNovelRepository.js');
+vi.mock('./logging/index.js');
 
 describe('Indexer', () => {
   let indexer: Indexer;
@@ -20,10 +22,26 @@ describe('Indexer', () => {
   let mockNovelRepository: {
     getProject: ReturnType<typeof vi.fn>;
   };
+  let mockLogger: {
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    debug: ReturnType<typeof vi.fn>;
+  };
   const testProjectRoot = '/test/project';
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // ロガーのモックを設定
+    mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    };
+
+    vi.mocked(getLogger).mockReturnValue(mockLogger as any);
 
     mockConfig = {
       projectRoot: testProjectRoot,
@@ -121,16 +139,15 @@ describe('Indexer', () => {
       // ディレクトリ作成のモック
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
-      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.indexNovel('test-novel');
 
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
         '🔍 小説プロジェクト "test-novel" のファイルを走査中...',
       );
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('📄 合計 3 個のファイルを発見'),
       );
-      expect(consoleSpy).toHaveBeenCalledWith(
+      expect(mockLogger.info).toHaveBeenCalledWith(
         expect.stringContaining('🎉 小説プロジェクト "test-novel" のインデックス構築完了'),
       );
     });
@@ -150,11 +167,11 @@ describe('Indexer', () => {
       vi.mocked(fs.readFile).mockRejectedValueOnce(new Error('Read error'));
       vi.mocked(fs.mkdir).mockResolvedValue(undefined);
 
-      const consoleErrorSpy = vi.spyOn(console, 'error');
       await indexer.indexNovel('test-novel');
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
-        expect.stringContaining('✗ test-novel/contents/error.md: Error:'),
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        expect.stringContaining('✗ test-novel/contents/error.md'),
+        expect.any(Error),
       );
     });
   });
@@ -183,10 +200,9 @@ describe('Indexer', () => {
 
       vi.mocked(fs.readFile).mockResolvedValueOnce(testContent);
 
-      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.updateFile(testFilePath, 'test-novel');
 
-      expect(consoleSpy).toHaveBeenCalledWith('🔄 ファイルを更新しました: update.md');
+      expect(mockLogger.info).toHaveBeenCalledWith('🔄 ファイルを更新しました: update.md');
     });
 
     it('ファイル更新時のエラーを適切にハンドリングする', async () => {
@@ -194,10 +210,9 @@ describe('Indexer', () => {
 
       vi.mocked(fs.readFile).mockRejectedValueOnce(new Error('Read error'));
 
-      const consoleErrorSpy = vi.spyOn(console, 'error');
       await indexer.updateFile(testFilePath, 'test-novel');
 
-      expect(consoleErrorSpy).toHaveBeenCalledWith(
+      expect(mockLogger.error).toHaveBeenCalledWith(
         `❌ ファイル更新エラー: ${testFilePath}`,
         expect.any(Error),
       );
@@ -208,19 +223,17 @@ describe('Indexer', () => {
     it('ファイルの削除を処理する', async () => {
       const testFilePath = '/test/project/remove.md';
 
-      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.removeFile(testFilePath);
 
-      expect(consoleSpy).toHaveBeenCalledWith('🗑️ ファイルを削除しました: remove.md');
+      expect(mockLogger.info).toHaveBeenCalledWith('🗑️ ファイルを削除しました: remove.md');
     });
 
     it('ファイル削除時のエラーを適切にハンドリングする', async () => {
       const testFilePath = '/test/project/error.md';
 
-      const consoleSpy = vi.spyOn(console, 'error');
       await indexer.removeFile(testFilePath);
 
-      expect(consoleSpy).toHaveBeenCalledWith('🗑️ ファイルを削除しました: error.md');
+      expect(mockLogger.info).toHaveBeenCalledWith('🗑️ ファイルを削除しました: error.md');
     });
   });
 

@@ -1,12 +1,31 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileWatcher, createDefaultFileWatcherConfig } from './fileWatcher.js';
 import path from 'path';
+import { getLogger } from '../logging/index.js';
+
+// ロガーをモック化
+vi.mock('../logging/index.js');
 
 describe('FileWatcher', () => {
   let fileWatcher: FileWatcher;
+  let mockLogger: {
+    info: ReturnType<typeof vi.fn>;
+    warn: ReturnType<typeof vi.fn>;
+    error: ReturnType<typeof vi.fn>;
+    debug: ReturnType<typeof vi.fn>;
+  };
   const testProjectRoot = path.join(process.cwd(), 'test-project');
 
   beforeEach(() => {
+    // ロガーのモックを設定
+    mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    };
+    vi.mocked(getLogger).mockReturnValue(mockLogger as any);
+
     const config = createDefaultFileWatcherConfig(testProjectRoot);
     config.debounceMs = 50; // テスト用に短縮
     fileWatcher = new FileWatcher(config);
@@ -58,8 +77,6 @@ describe('FileWatcher', () => {
     });
 
     it('既に開始されている場合は警告を出す', async () => {
-      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-
       const readyPromise = new Promise<void>((resolve) => {
         fileWatcher.once('ready', resolve);
       });
@@ -70,8 +87,7 @@ describe('FileWatcher', () => {
       // 2回目の開始
       await fileWatcher.start();
 
-      expect(consoleSpy).toHaveBeenCalledWith('⚠️  ファイル監視は既に開始されています');
-      consoleSpy.mockRestore();
+      expect(mockLogger.warn).toHaveBeenCalledWith('⚠️  ファイル監視は既に開始されています');
     });
   });
 

@@ -66,7 +66,7 @@ export class IndexerManager {
    */
   private async ensureNovelInitialized(novelId: string): Promise<void> {
     if (!this.initializedNovels.has(novelId)) {
-      console.error(`📚 小説プロジェクトのインデックスを構築: ${novelId}`);
+      this.logger.info(`📚 小説プロジェクトのインデックスを構築: ${novelId}`);
       await this.indexer.indexNovel(novelId);
       this.initializedNovels.add(novelId);
     }
@@ -89,7 +89,7 @@ export class IndexerManager {
     if (this.initializedNovels.has(novelId)) {
       await this.indexer.removeNovelFromIndex(novelId);
       this.initializedNovels.delete(novelId);
-      console.error(`🗑️ 小説プロジェクトのインデックスを削除: ${novelId}`);
+      this.logger.info(`🗑️ 小説プロジェクトのインデックスを削除: ${novelId}`);
     }
   }
 
@@ -248,7 +248,7 @@ export class IndexerManager {
    */
   async startFileWatching(): Promise<void> {
     if (this.fileWatcher) {
-      console.error('⚠️  ファイル監視は既に開始されています');
+      this.logger.warn('⚠️  ファイル監視は既に開始されています');
       return;
     }
 
@@ -261,7 +261,7 @@ export class IndexerManager {
     });
 
     this.fileWatcher.on('error', (error: Error) => {
-      console.error('❌ ファイル監視エラー:', error);
+      this.logger.error('❌ ファイル監視エラー:', error);
     });
 
     await this.fileWatcher.start();
@@ -299,7 +299,7 @@ export class IndexerManager {
           break;
       }
     } catch (error) {
-      console.error(`❌ ファイル変更処理エラー (${event.type}): ${event.filePath}`, error);
+      this.logger.error(`❌ ファイル変更処理エラー (${event.type}): ${event.filePath}`, error instanceof Error ? error : undefined);
     }
   }
 
@@ -311,6 +311,6 @@ export class IndexerManager {
     await this.indexer.cleanup();
     await this.qdrantInitService.cleanup();
     this.initializedNovels.clear();
-    console.error('🧹 全てのインデックスをクリーンアップしました');
+    this.logger.info('🧹 全てのインデックスをクリーンアップしました');
   }
 }

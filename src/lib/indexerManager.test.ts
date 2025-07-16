@@ -2,9 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IndexerManager } from './indexerManager.js';
 import { DialogoiConfig } from './config.js';
 import { Indexer } from '../indexer.js';
+import { getLogger } from '../logging/index.js';
 
 // Indexerをモック化
 vi.mock('../indexer.js');
+
+// ロガーをモック化
+vi.mock('../logging/index.js');
 
 // QdrantInitializationServiceをモック化
 vi.mock('../services/QdrantInitializationService.js', () => ({
@@ -29,6 +33,15 @@ describe('IndexerManager', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+
+    // ロガーのモックを設定
+    const mockLogger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+      debug: vi.fn(),
+    };
+    vi.mocked(getLogger).mockReturnValue(mockLogger as any);
 
     mockConfig = {
       projectRoot: '/test/novels',

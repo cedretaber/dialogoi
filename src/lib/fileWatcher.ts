@@ -1,6 +1,7 @@
 import chokidar, { FSWatcher } from 'chokidar';
 import path from 'path';
 import { EventEmitter } from 'events';
+import { getLogger } from '../logging/index.js';
 
 /**
  * ファイル変更イベントの種類
@@ -36,6 +37,7 @@ export class FileWatcher extends EventEmitter {
   private config: FileWatcherConfig;
   private debounceTimers: Map<string, NodeJS.Timeout> = new Map();
   private isWatching = false;
+  private logger = getLogger();
 
   constructor(config: FileWatcherConfig) {
     super();
@@ -47,19 +49,19 @@ export class FileWatcher extends EventEmitter {
    */
   async start(): Promise<void> {
     if (this.isWatching) {
-      console.error('⚠️  ファイル監視は既に開始されています');
+      this.logger.warn('⚠️  ファイル監視は既に開始されています');
       return;
     }
 
-    console.error('👁️  ファイル監視を開始します');
-    console.error(`📁 監視対象: ${this.config.projectRoot}`);
-    console.error(`📄 対象拡張子: ${this.config.watchedExtensions.join(', ')}`);
+    this.logger.info('👁️  ファイル監視を開始します');
+    this.logger.info(`📁 監視対象: ${this.config.projectRoot}`);
+    this.logger.info(`📄 対象拡張子: ${this.config.watchedExtensions.join(', ')}`);
 
     // ディレクトリ監視に戻す
     const watchPatterns = [this.config.projectRoot];
 
-    console.error(`🔍 監視パターン: ${watchPatterns.join(', ')}`);
-    console.error(`🚫 無視パターン: ${this.config.ignorePatterns.join(', ')}`);
+    this.logger.info(`🔍 監視パターン: ${watchPatterns.join(', ')}`);
+    this.logger.info(`🚫 無視パターン: ${this.config.ignorePatterns.join(', ')}`);
 
     this.watcher = chokidar.watch(watchPatterns, {
       ignored: this.config.ignorePatterns,
@@ -73,33 +75,33 @@ export class FileWatcher extends EventEmitter {
     });
 
     this.watcher.on('add', (filePath: string) => {
-      console.error(`📝 ファイル追加検知: ${filePath}`);
+      this.logger.debug(`📝 ファイル追加検知: ${filePath}`);
       this.handleFileEvent('add', filePath);
     });
 
     this.watcher.on('change', (filePath: string) => {
-      console.error(`📝 ファイル変更検知: ${filePath}`);
+      this.logger.debug(`📝 ファイル変更検知: ${filePath}`);
       this.handleFileEvent('change', filePath);
     });
 
     this.watcher.on('unlink', (filePath: string) => {
-      console.error(`📝 ファイル削除検知: ${filePath}`);
+      this.logger.debug(`📝 ファイル削除検知: ${filePath}`);
       this.handleFileEvent('unlink', filePath);
     });
 
     this.watcher.on('error', (error: unknown) => {
-      console.error('❌ ファイル監視エラー:', error);
+      this.logger.error('❌ ファイル監視エラー:', error instanceof Error ? error : undefined);
       this.emit('error', error);
     });
 
     this.watcher.on('ready', () => {
-      console.error('✅ ファイル監視の初期化が完了しました');
+      this.logger.info('✅ ファイル監視の初期化が完了しました');
       const watched = this.watcher?.getWatched();
       if (watched) {
         const watchedFiles = Object.keys(watched).reduce((acc, dir) => {
           return acc + watched[dir].length;
         }, 0);
-        console.error(`📊 監視中のファイル数: ${watchedFiles}`);
+        this.logger.info(`📊 監視中のファイル数: ${watchedFiles}`);
       }
       this.isWatching = true;
       this.emit('ready');
@@ -114,7 +116,7 @@ export class FileWatcher extends EventEmitter {
       return;
     }
 
-    console.error('🛑 ファイル監視を停止します');
+    this.logger.info('🛑 ファイル監視を停止します');
 
     // デバウンスタイマーをクリア
     for (const timer of this.debounceTimers.values()) {
@@ -175,7 +177,7 @@ export class FileWatcher extends EventEmitter {
         novelId,
       };
 
-      console.error(
+      this.logger.info(
         `📝 ファイル${this.getEventTypeDisplay(type)}: ${path.relative(this.config.projectRoot, absolutePath)}`,
       );
       this.emit('fileChange', event);

@@ -9,6 +9,7 @@ import { TransformersEmbeddingService } from './services/TransformersEmbeddingSe
 import { QdrantVectorRepository } from './repositories/QdrantVectorRepository.js';
 import { NovelRepository } from './repositories/NovelRepository.js';
 import { FileSystemNovelRepository } from './repositories/FileSystemNovelRepository.js';
+import { getLogger } from './logging/index.js';
 
 /**
  * ファイルタイプとファイルパスのペア
@@ -28,6 +29,7 @@ export class Indexer {
   private config: DialogoiConfig;
   private projectRoot: string;
   private novelRepository: NovelRepository;
+  private logger = getLogger();
 
   constructor(config: DialogoiConfig) {
     this.config = config;
@@ -51,14 +53,14 @@ export class Indexer {
    */
   async indexNovel(novelId: string): Promise<void> {
     const startTime = Date.now();
-    console.error(`🔍 小説プロジェクト "${novelId}" のファイルを走査中...`);
+    this.logger.info(`🔍 小説プロジェクト "${novelId}" のファイルを走査中...`);
 
     // VectorBackend を初期化
     await this.backend.initialize();
 
     // ターゲットファイルを検索（*.md, *.txt）
     const files = await this.findTargetFiles(novelId);
-    console.error(`📄 ${files.length} 個のファイルを発見`);
+    this.logger.info(`📄 ${files.length} 個のファイルを発見`);
 
     let totalChunks = 0;
 
@@ -67,16 +69,19 @@ export class Indexer {
       try {
         const chunks = await this.processFile(file.filePath, novelId, file.fileType);
         totalChunks += chunks.length;
-        console.error(
+        this.logger.info(
           `  ✓ ${path.relative(this.projectRoot, file.filePath)}: ${chunks.length} チャンク (${file.fileType})`,
         );
       } catch (error) {
-        console.error(`  ✗ ${path.relative(this.projectRoot, file.filePath)}: ${error}`);
+        this.logger.error(
+          `  ✗ ${path.relative(this.projectRoot, file.filePath)}`,
+          error instanceof Error ? error : undefined,
+        );
       }
     }
 
     const duration = Date.now() - startTime;
-    console.error(
+    this.logger.info(
       `🎉 小説プロジェクト "${novelId}" のインデックス構築完了: ${totalChunks} チャンク, ${duration}ms`,
     );
   }
@@ -104,7 +109,7 @@ export class Indexer {
       await this.backend.removeByFile(relativePath);
     } catch (error) {
       // 削除処理が失敗しても処理を続行（例：該当するチャンクがない場合）
-      console.error(`⚠️ 既存チャンクの削除に失敗しました（処理続行）: ${relativePath}`, error);
+      this.logger.warn(`⚠️ 既存チャンクの削除に失敗しました（処理続行）: ${relativePath}`);
     }
 
     // チャンキング実行
@@ -151,12 +156,12 @@ export class Indexer {
       }
 
       // どちらにも該当しない場合は'content'をデフォルトとする
-      console.error(
+      this.logger.warn(
         `⚠️ ファイルタイプを判定できませんでした: ${relativePath}, デフォルトで'content'を使用`,
       );
       return 'content';
     } catch (error) {
-      console.error(
+      this.logger.warn(
         `⚠️ プロジェクト情報の取得に失敗しました: ${novelId}, デフォルトで'content'を使用`,
       );
       return 'content';
@@ -167,7 +172,7 @@ export class Indexer {
    * 特定の小説プロジェクトのターゲットファイル（本文・設定ファイル）を検索
    */
   private async findTargetFiles(novelId: string): Promise<FileWithType[]> {
-    console.error(`🔍 小説プロジェクト \"${novelId}\" のファイルを検索中...`);
+    this.logger.info(`🔍 小説プロジェクト \"${novelId}\" のファイルを検索中...`);
 
     try {
       // NovelRepositoryを使用してプロジェクト情報を取得
@@ -190,13 +195,16 @@ export class Indexer {
       );
       targetFiles.push(...contentFiles);
 
-      console.error(
+      this.logger.info(
         `📄 合計 ${targetFiles.length} 個のファイルを発見 (設定: ${settingsFiles.length}, 本文: ${contentFiles.length})`,
       );
 
       return targetFiles.sort((a, b) => a.filePath.localeCompare(b.filePath));
     } catch (error) {
-      console.error(`❌ 小説プロジェクト \"${novelId}\" の検索に失敗しました:`, error);
+      this.logger.error(
+        `❌ 小説プロジェクト \"${novelId}\" の検索に失敗しました`,
+        error instanceof Error ? error : undefined,
+      );
       return [];
     }
   }
@@ -218,7 +226,7 @@ export class Indexer {
       try {
         const stat = await fs.stat(fullDirPath);
         if (!stat.isDirectory()) {
-          console.error(`⚠️ 指定されたディレクトリが存在しません: ${fullDirPath}`);
+          this.logger.warn(`⚠️ 指定されたディレクトリが存在しません: ${fullDirPath}`);
           continue;
         }
 
@@ -231,9 +239,9 @@ export class Indexer {
           });
         }
 
-        console.error(`  📁 ${dir}: ${foundFiles.length} 個のファイル`);
+        this.logger.info(`  📁 ${dir}: ${foundFiles.length} 個のファイル`);
       } catch (error) {
-        console.error(`⚠️ ディレクトリ "${dir}" の検索に失敗しました:`, error);
+        this.logger.warn(`⚠️ ディレクトリ "${dir}" の検索に失敗しました`);
         continue;
       }
     }
@@ -258,9 +266,12 @@ export class Indexer {
       await this.processFile(filePath, novelId);
 
       const relativePath = path.relative(this.projectRoot, filePath);
-      console.error(`🔄 ファイルを更新しました: ${relativePath}`);
+      this.logger.info(`🔄 ファイルを更新しました: ${relativePath}`);
     } catch (error) {
-      console.error(`❌ ファイル更新エラー: ${filePath}`, error);
+      this.logger.error(
+        `❌ ファイル更新エラー: ${filePath}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -273,9 +284,12 @@ export class Indexer {
       // 相対パスに変換して削除
       const relativePath = path.relative(this.projectRoot, filePath);
       await this.removeFileChunks(relativePath);
-      console.error(`🗑️ ファイルを削除しました: ${relativePath}`);
+      this.logger.info(`🗑️ ファイルを削除しました: ${relativePath}`);
     } catch (error) {
-      console.error(`❌ ファイル削除エラー: ${filePath}`, error);
+      this.logger.error(
+        `❌ ファイル削除エラー: ${filePath}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 
@@ -315,7 +329,7 @@ export class Indexer {
     // VectorBackend を初期化
     await this.backend.initialize();
     await this.backend.removeByNovel(novelId);
-    console.error(`🗑️ 小説プロジェクト "${novelId}" のインデックスを削除しました`);
+    this.logger.info(`🗑️ 小説プロジェクト "${novelId}" のインデックスを削除しました`);
   }
 
   /**

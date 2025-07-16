@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { getLogger } from '../logging/index.js';
 
 // 設定の型定義
 export interface DialogoiConfig {
@@ -247,10 +248,12 @@ export function loadConfig(configPath?: string): DialogoiConfig {
   try {
     const configContent = fs.readFileSync(targetPath, 'utf-8');
     fileConfig = JSON.parse(configContent) as Partial<DialogoiConfig>;
-    console.error(`✅ 設定ファイルをロードしました: ${targetPath}`);
+    const logger = getLogger();
+    logger.info(`✅ 設定ファイルをロードしました: ${targetPath}`);
   } catch (error) {
-    console.error(`⚠️  設定ファイルが見つかりません: ${targetPath}`);
-    console.error('📝 デフォルト設定を使用します');
+    const logger = getLogger();
+    logger.warn(`⚠️  設定ファイルが見つかりません: ${targetPath}`);
+    logger.info('📝 デフォルト設定を使用します');
   }
 
   // コマンドライン引数の上書きを取得
@@ -261,7 +264,8 @@ export function loadConfig(configPath?: string): DialogoiConfig {
 
   // CLI引数があれば通知
   if (Object.keys(cliOverrides).length > 0) {
-    console.error('📋 コマンドライン引数で設定を上書きしました:', cliOverrides);
+    const logger = getLogger();
+    logger.info('📋 コマンドライン引数で設定を上書きしました:', cliOverrides);
   }
 
   return _config;
