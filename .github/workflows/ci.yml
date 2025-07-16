@@ -12,6 +12,19 @@ jobs:
     strategy:
       matrix:
         node-version: [22.x, 24.x]
+
+    # Qdrantサービスの追加
+    services:
+      qdrant:
+        image: qdrant/qdrant:latest
+        ports:
+          - 6333:6333
+        options: >-
+          --health-cmd "curl -f http://localhost:6333/healthz || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v3
@@ -42,3 +55,9 @@ jobs:
 
       - name: Run integration tests
         run: npm run test:integration
+
+      - name: Run Qdrant integration tests
+        env:
+          QDRANT_URL: http://localhost:6333
+          CI_QDRANT_TEST: true
+        run: npm run test:integration:qdrant

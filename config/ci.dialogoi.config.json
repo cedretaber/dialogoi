@@ -1,0 +1,34 @@
+{
+  "projectRoot": "./novels",
+  "chunk": {
+    "maxTokens": 400,
+    "overlap": 0.2
+  },
+  "embedding": {
+    "enabled": true,
+    "model": "intfloat/multilingual-e5-small",
+    "dimensions": 384,
+    "batchSize": 32
+  },
+  "qdrant": {
+    "url": "http://localhost:6333",
+    "collection": "test-dialogoi-chunks",
+    "timeout": 10000,
+    "docker": {
+      "enabled": false,
+      "image": "qdrant/qdrant",
+      "timeout": 30000,
+      "autoCleanup": false
+    }
+  },
+  "vector": {
+    "collectionName": "test-dialogoi-chunks",
+    "scoreThreshold": 0.5,
+    "vectorDimensions": 384,
+    "snippetLength": 200
+  },
+  "search": {
+    "defaultK": 10,
+    "maxK": 50
+  }
+}
