@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FileWatcher, createDefaultFileWatcherConfig } from './fileWatcher.js';
 import path from 'path';
-import { getLogger } from '../logging/index.js';
+import { getLogger, type Logger } from '../logging/index.js';
 
 // ロガーをモック化
 vi.mock('../logging/index.js');
@@ -24,7 +24,12 @@ describe('FileWatcher', () => {
       error: vi.fn(),
       debug: vi.fn(),
     };
-    vi.mocked(getLogger).mockReturnValue(mockLogger as any);
+    vi.mocked(getLogger).mockReturnValue({
+      ...mockLogger,
+      setLevel: vi.fn(),
+      addAppender: vi.fn(),
+      removeAppender: vi.fn(),
+    } as Logger);
 
     const config = createDefaultFileWatcherConfig(testProjectRoot);
     config.debounceMs = 50; // テスト用に短縮

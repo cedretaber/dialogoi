@@ -5,7 +5,7 @@ import { Indexer } from './indexer.js';
 import { DialogoiConfig } from './lib/config.js';
 import { findFilesRecursively } from './utils/fileUtils.js';
 import { FileSystemNovelRepository } from './repositories/FileSystemNovelRepository.js';
-import { getLogger } from './logging/index.js';
+import { getLogger, type Logger } from './logging/index.js';
 
 // モックの設定
 vi.mock('fs/promises');
@@ -41,7 +41,12 @@ describe('Indexer', () => {
       debug: vi.fn(),
     };
 
-    vi.mocked(getLogger).mockReturnValue(mockLogger as any);
+    vi.mocked(getLogger).mockReturnValue({
+      ...mockLogger,
+      setLevel: vi.fn(),
+      addAppender: vi.fn(),
+      removeAppender: vi.fn(),
+    } as Logger);
 
     mockConfig = {
       projectRoot: testProjectRoot,

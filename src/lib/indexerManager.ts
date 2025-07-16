@@ -299,7 +299,10 @@ export class IndexerManager {
           break;
       }
     } catch (error) {
-      this.logger.error(`❌ ファイル変更処理エラー (${event.type}): ${event.filePath}`, error instanceof Error ? error : undefined);
+      this.logger.error(
+        `❌ ファイル変更処理エラー (${event.type}): ${event.filePath}`,
+        error instanceof Error ? error : undefined,
+      );
     }
   }
 

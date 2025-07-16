@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { IndexerManager } from './indexerManager.js';
 import { DialogoiConfig } from './config.js';
 import { Indexer } from '../indexer.js';
-import { getLogger } from '../logging/index.js';
+import { getLogger, type Logger } from '../logging/index.js';
 
 // Indexerをモック化
 vi.mock('../indexer.js');
@@ -41,7 +41,12 @@ describe('IndexerManager', () => {
       error: vi.fn(),
       debug: vi.fn(),
     };
-    vi.mocked(getLogger).mockReturnValue(mockLogger as any);
+    vi.mocked(getLogger).mockReturnValue({
+      ...mockLogger,
+      setLevel: vi.fn(),
+      addAppender: vi.fn(),
+      removeAppender: vi.fn(),
+    } as Logger);
 
     mockConfig = {
       projectRoot: '/test/novels',
