@@ -469,20 +469,31 @@ export class QdrantVectorRepository implements VectorRepository {
 
     try {
       const info = await this.client.getCollection(collectionName);
-      logger.debug(`Retrieved collection info: ${collectionName}`);
+      logger.debug(`Retrieved collection info: ${collectionName}`, info);
 
       // Qdrantのレスポンスを共通インターフェースに変換
       const qdrantInfo = info as {
         status?: string;
         vectors_count?: number;
         indexed_vectors_count?: number;
+        points_count?: number;
         [key: string]: unknown;
       };
 
+      // より多くのフィールドを確認
+      const vectorsCount = qdrantInfo.vectors_count || qdrantInfo.points_count || 0;
+      const indexedVectorsCount = qdrantInfo.indexed_vectors_count || 0;
+
+      logger.debug(`Parsed collection info: ${collectionName}`, {
+        vectorsCount,
+        indexedVectorsCount,
+        status: qdrantInfo.status,
+      });
+
       return {
         status: qdrantInfo.status || 'unknown',
-        vectorsCount: qdrantInfo.vectors_count || 0,
-        indexedVectorsCount: qdrantInfo.indexed_vectors_count || 0,
+        vectorsCount,
+        indexedVectorsCount,
         ...qdrantInfo,
       };
     } catch (error) {

@@ -364,6 +364,8 @@ export class VectorBackend extends SearchBackend {
         this.config.collectionName,
       );
 
+      logger.debug('Collection info for stats:', collectionInfo);
+
       return {
         memoryUsage: this.stats.memoryUsage,
         lastUpdated: this.stats.lastUpdated,

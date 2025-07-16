@@ -5,8 +5,8 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/integration-qdrant/**/*.test.ts'],
-    testTimeout: 30000, // Qdrant統合テストのタイムアウト
-    hookTimeout: 35000, // beforeEach/afterEachフックのタイムアウト
+    testTimeout: 60000, // Qdrant統合テストのタイムアウト
+    hookTimeout: 65000, // beforeEach/afterEachフックのタイムアウト
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -27,7 +27,7 @@ describe.skipIf(!isCI)('VectorBackend Qdrant Integration Tests', () => {
     // リポジトリとサービスの初期化
     vectorRepository = new QdrantVectorRepository({
       url: qdrantUrl,
-      timeout: 10000,
+      timeout: 30000,
       defaultCollection: testCollectionName,
     });
 
@@ -324,26 +324,17 @@ describe.skipIf(!isCI)('VectorBackend Qdrant Integration Tests', () => {
       ];
 
       await vectorBackend.add(testChunks);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      // Qdrantのインデックス作成を待機（より長い時間）
+      await new Promise((resolve) => setTimeout(resolve, 5000));
 
       // 追加後の統計情報を取得
       const stats = await vectorBackend.getStats();
 
-      console.log('Stats:', stats);
-      console.log('Initial stats:', initialStats);
-
       expect(stats).toBeDefined();
       expect(stats.lastUpdated).toBeDefined();
-
-      // 統計情報の値を個別に確認
-      if (stats.totalChunks !== undefined) {
-        expect(stats.totalChunks).toBeGreaterThan(0);
-        // 初期状態よりもチャンク数が増加していることを確認
-        expect(stats.totalChunks).toBeGreaterThan(initialStats.totalChunks || 0);
-      } else {
-        // totalChunksが取得できない場合は警告のみ
-        console.warn('totalChunks is undefined, skipping count assertion');
-      }
+      expect(stats.totalChunks).toBeGreaterThan(0);
+      // 初期状態よりもチャンク数が増加していることを確認
+      expect(stats.totalChunks).toBeGreaterThan(initialStats.totalChunks || 0);
     });
   });
 });
