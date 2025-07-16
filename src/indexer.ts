@@ -7,6 +7,16 @@ import { DialogoiConfig } from './lib/config.js';
 import { findFilesRecursively } from './utils/fileUtils.js';
 import { TransformersEmbeddingService } from './services/TransformersEmbeddingService.js';
 import { QdrantVectorRepository } from './repositories/QdrantVectorRepository.js';
+import { NovelRepository } from './repositories/NovelRepository.js';
+import { FileSystemNovelRepository } from './repositories/FileSystemNovelRepository.js';
+
+/**
+ * ファイルタイプとファイルパスのペア
+ */
+interface FileWithType {
+  filePath: string;
+  fileType: 'content' | 'settings';
+}
 
 /**
  * インデックス管理クラス
@@ -17,10 +27,12 @@ export class Indexer {
   private chunkingStrategy: MarkdownChunkingStrategy;
   private config: DialogoiConfig;
   private projectRoot: string;
+  private novelRepository: NovelRepository;
 
   constructor(config: DialogoiConfig) {
     this.config = config;
     this.projectRoot = path.resolve(config.projectRoot);
+    this.novelRepository = new FileSystemNovelRepository(this.projectRoot);
 
     // VectorBackend の初期化
     const embeddingService = new TransformersEmbeddingService(config.embedding);
@@ -51,15 +63,15 @@ export class Indexer {
     let totalChunks = 0;
 
     // 各ファイルを処理
-    for (const filePath of files) {
+    for (const file of files) {
       try {
-        const chunks = await this.processFile(filePath, novelId);
+        const chunks = await this.processFile(file.filePath, novelId, file.fileType);
         totalChunks += chunks.length;
         console.error(
-          `  ✓ ${path.relative(this.projectRoot, filePath)}: ${chunks.length} チャンク`,
+          `  ✓ ${path.relative(this.projectRoot, file.filePath)}: ${chunks.length} チャンク (${file.fileType})`,
         );
       } catch (error) {
-        console.error(`  ✗ ${path.relative(this.projectRoot, filePath)}: ${error}`);
+        console.error(`  ✗ ${path.relative(this.projectRoot, file.filePath)}: ${error}`);
       }
     }
 
@@ -73,11 +85,19 @@ export class Indexer {
    * 単一ファイルを処理してチャンクを生成・追加
    * @param filePath 処理対象ファイルの絶対パス
    * @param novelId 小説プロジェクトID
+   * @param fileType ファイルタイプ ('content' | 'settings')
    * @returns 生成されたチャンク配列
    */
-  async processFile(filePath: string, novelId: string): Promise<Chunk[]> {
+  async processFile(
+    filePath: string,
+    novelId: string,
+    fileType?: 'content' | 'settings',
+  ): Promise<Chunk[]> {
     const content = await fs.readFile(filePath, 'utf-8');
     const relativePath = path.relative(this.projectRoot, filePath);
+
+    // ファイルタイプが指定されていない場合は、パスから推定
+    const determinedFileType = fileType || (await this.determineFileType(novelId, relativePath));
 
     // 既存のチャンクを削除（前のデータをクリア）
     try {
@@ -88,16 +108,14 @@ export class Indexer {
     }
 
     // チャンキング実行
-    const chunkData = this.chunkingStrategy.chunk(
+    const chunks = this.chunkingStrategy.chunk(
       content,
       relativePath,
       this.config.chunk.maxTokens,
       this.config.chunk.overlap,
       novelId,
+      determinedFileType,
     );
-
-    // ChunkDataはそのままChunkとして使用可能
-    const chunks: Chunk[] = chunkData;
 
     // バックエンドに追加
     await this.backend.add(chunks);
@@ -106,29 +124,121 @@ export class Indexer {
   }
 
   /**
-   * 特定の小説プロジェクトのターゲットファイル（*.md, *.txt）を検索
+   * ファイルパスからファイルタイプを推定
+   * @param novelId 小説プロジェクトID
+   * @param relativePath プロジェクトルートからの相対パス
+   * @returns ファイルタイプ
    */
-  private async findTargetFiles(novelId: string): Promise<string[]> {
-    const novelPath = path.join(this.projectRoot, novelId);
-    console.error(`🔍 検索対象パス: ${novelPath}`);
-
-    // プロジェクトディレクトリが存在するかチェック
+  private async determineFileType(
+    novelId: string,
+    relativePath: string,
+  ): Promise<'content' | 'settings'> {
     try {
-      const stat = await fs.stat(novelPath);
-      if (!stat.isDirectory()) {
-        console.error(`❌ プロジェクトディレクトリが見つかりません: ${novelPath}`);
-        return [];
+      const project = await this.novelRepository.getProject(novelId);
+
+      // 設定ディレクトリに含まれるかチェック
+      for (const settingsDir of project.config.settingsDirectories) {
+        if (relativePath.startsWith(settingsDir + path.sep)) {
+          return 'settings';
+        }
       }
+
+      // 本文ディレクトリに含まれるかチェック
+      for (const contentDir of project.config.contentDirectories) {
+        if (relativePath.startsWith(contentDir + path.sep)) {
+          return 'content';
+        }
+      }
+
+      // どちらにも該当しない場合は'content'をデフォルトとする
+      console.error(
+        `⚠️ ファイルタイプを判定できませんでした: ${relativePath}, デフォルトで'content'を使用`,
+      );
+      return 'content';
     } catch (error) {
-      console.error(`❌ プロジェクトディレクトリにアクセスできません: ${novelPath}`, error);
+      console.error(
+        `⚠️ プロジェクト情報の取得に失敗しました: ${novelId}, デフォルトで'content'を使用`,
+      );
+      return 'content';
+    }
+  }
+
+  /**
+   * 特定の小説プロジェクトのターゲットファイル（本文・設定ファイル）を検索
+   */
+  private async findTargetFiles(novelId: string): Promise<FileWithType[]> {
+    console.error(`🔍 小説プロジェクト \"${novelId}\" のファイルを検索中...`);
+
+    try {
+      // NovelRepositoryを使用してプロジェクト情報を取得
+      const project = await this.novelRepository.getProject(novelId);
+      const targetFiles: FileWithType[] = [];
+
+      // 設定ファイルを検索
+      const settingsFiles = await this.getFilesFromDirectories(
+        project.path,
+        project.config.settingsDirectories,
+        'settings',
+      );
+      targetFiles.push(...settingsFiles);
+
+      // 本文ファイルを検索
+      const contentFiles = await this.getFilesFromDirectories(
+        project.path,
+        project.config.contentDirectories,
+        'content',
+      );
+      targetFiles.push(...contentFiles);
+
+      console.error(
+        `📄 合計 ${targetFiles.length} 個のファイルを発見 (設定: ${settingsFiles.length}, 本文: ${contentFiles.length})`,
+      );
+
+      return targetFiles.sort((a, b) => a.filePath.localeCompare(b.filePath));
+    } catch (error) {
+      console.error(`❌ 小説プロジェクト \"${novelId}\" の検索に失敗しました:`, error);
       return [];
     }
+  }
 
-    // findFilesRecursivelyを使用してファイルを検索
-    const files = await findFilesRecursively(novelPath, ['md', 'txt']);
-    console.error(`📄 合計 ${files.length} 個のファイルを発見: ${files.join(', ')}`);
+  /**
+   * 指定されたディレクトリからファイルを検索
+   */
+  private async getFilesFromDirectories(
+    projectPath: string,
+    directories: string[],
+    fileType: 'content' | 'settings',
+  ): Promise<FileWithType[]> {
+    const files: FileWithType[] = [];
+    const extensions = ['md', 'txt'];
 
-    return files.sort();
+    for (const dir of directories) {
+      const fullDirPath = path.join(projectPath, dir);
+
+      try {
+        const stat = await fs.stat(fullDirPath);
+        if (!stat.isDirectory()) {
+          console.error(`⚠️ 指定されたディレクトリが存在しません: ${fullDirPath}`);
+          continue;
+        }
+
+        const foundFiles = await findFilesRecursively(fullDirPath, extensions);
+
+        for (const filePath of foundFiles) {
+          files.push({
+            filePath,
+            fileType,
+          });
+        }
+
+        console.error(`  📁 ${dir}: ${foundFiles.length} 個のファイル`);
+      } catch (error) {
+        console.error(`⚠️ ディレクトリ "${dir}" の検索に失敗しました:`, error);
+        continue;
+      }
+    }
+
+    return files;
   }
 
   /**

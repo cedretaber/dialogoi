@@ -27,6 +27,7 @@ export class Chunk {
     public endLine: number, // 終了行番号
     public chunkIndex: number, // チャンク番号
     public novelId: string, // 小説プロジェクトID
+    public fileType?: 'content' | 'settings', // ファイルタイプ
     public tags?: string[], // オプションのタグ
   ) {}
 

@@ -144,6 +144,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     maxTokens: number,
     overlapRatio: number,
     novelId: string,
+    fileType?: 'content' | 'settings',
   ): Chunk[] {
     const lines = text.split('\n');
     const chunks: Chunk[] = [];
@@ -152,7 +153,14 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     const sections = this.extractSections(lines);
 
     for (const section of sections) {
-      const sectionChunks = this.chunkSection(section, filePath, maxTokens, overlapRatio, novelId);
+      const sectionChunks = this.chunkSection(
+        section,
+        filePath,
+        maxTokens,
+        overlapRatio,
+        novelId,
+        fileType,
+      );
       chunks.push(...sectionChunks);
     }
 
@@ -221,6 +229,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     maxTokens: number,
     overlapRatio: number,
     novelId: string,
+    fileType?: 'content' | 'settings',
   ): Chunk[] {
     const sectionText = section.lines.join('\n');
     const sectionTokens = this.tokenCounter.count(sectionText);
@@ -239,12 +248,13 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
           section.endLine,
           0,
           novelId,
+          fileType,
         ),
       ];
     }
 
     // セクションを段落単位で分割してチャンク化
-    return this.chunkByParagraphs(section, filePath, maxTokens, overlapRatio, novelId);
+    return this.chunkByParagraphs(section, filePath, maxTokens, overlapRatio, novelId, fileType);
   }
 
   /**
@@ -256,6 +266,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
     maxTokens: number,
     overlapRatio: number,
     novelId: string,
+    fileType?: 'content' | 'settings',
   ): Chunk[] {
     const chunks: Chunk[] = [];
     const paragraphs = this.extractParagraphs(section.lines);
@@ -282,6 +293,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
               currentStartLine + currentChunkLines.length - 1,
               chunkIndex++,
               novelId,
+              fileType,
             ),
           );
 
@@ -311,6 +323,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
                 currentStartLine + currentChunkLines.length - 1,
                 chunkIndex++,
                 novelId,
+                fileType,
               ),
             );
 
@@ -348,6 +361,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
                 currentStartLine + currentChunkLines.length - 1,
                 chunkIndex++,
                 novelId,
+                fileType,
               ),
             );
 
@@ -384,6 +398,7 @@ export class MarkdownChunkingStrategy implements ChunkingStrategy {
           currentStartLine + currentChunkLines.length - 1,
           chunkIndex,
           novelId,
+          fileType,
         ),
       );
     }

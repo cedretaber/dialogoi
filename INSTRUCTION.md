@@ -432,7 +432,165 @@ novels/
 
 ---
 
-## 8. 開発時の注意事項
+## 8. Phase 4: RAG検索の最適化とファイルタイプ別検索
+
+### 8.1 実装目標
+
+**現在の問題点**:
+
+- RAG検索で全ファイルを対象としているが、「本文」と「設定」ファイルのみを対象とすべき
+- アプリケーションレベルでのフィルタリングによる性能低下
+- ファイルタイプによる検索の区別ができない
+
+**改善目標**:
+
+- NovelRepositoryを使用して適切なファイルのみをインデックス化
+- Qdrantのpayloadインデックスと事前フィルタリングによる性能向上
+- 本文・設定ファイルを区別した検索機能の実装
+
+### 8.2 技術的アプローチ
+
+#### 8.2.1 Qdrant効率性の考慮
+
+**payloadインデックス戦略**:
+
+- `novelId`: 小説プロジェクトID（高選択性、必須インデックス）
+- `fileType`: "content" | "settings" （中選択性、必須インデックス）
+- `relativeFilePath`: ファイルパス（高選択性、オプション）
+
+**事前フィルタリング**:
+
+- アプリケーションレベルでの後処理フィルタリングを廃止
+- Qdrantクエリ時にfilterパラメータを使用
+- 検索性能の大幅な向上
+
+#### 8.2.2 payloadフィールドの再設計
+
+```typescript
+// VectorPointのpayload構造
+payload: {
+  novelId: string,        // 小説プロジェクトID（必須、インデックス推奨）
+  fileType: string,       // "content" | "settings" （必須、インデックス推奨）
+  relativeFilePath: string, // ファイルパス（必須）
+  startLine: number,      // 開始行
+  endLine: number,        // 終了行
+  chunkIndex: number,     // チャンク番号
+  title: string,          // タイトル
+  content: string,        // コンテンツ
+  tags?: string[],        // オプションのタグ
+  baseId: string,         // ベースID
+  hash: string,           // ハッシュ
+}
+```
+
+### 8.3 実装フェーズ
+
+#### Phase 4-1: ファイル検索ロジックの改善（優先度：高）✅ **完了**
+
+**TODO**:
+
+- [x] `Indexer.findTargetFiles`をNovelRepositoryベースに変更
+- [x] `settingsDirectories`と`contentDirectories`を使用した適切なファイル検索
+- [x] ファイルタイプの判定ロジック実装
+
+#### Phase 4-2: payloadフィールドの拡張（優先度：高）✅ **完了**
+
+**TODO**:
+
+- [x] `Chunk`クラスに`fileType`プロパティを追加
+- [x] `VectorBackend.add`でpayloadに`fileType`を含める
+- [x] `QdrantVectorRepository`でpayloadインデックスを設定
+
+#### Phase 4-3: 事前フィルタリングの実装（優先度：高）
+
+**TODO**:
+
+- [ ] `VectorRepository.searchVectors`にfilterパラメータを追加
+- [ ] `VectorBackend.search`でQdrant側フィルタリングを実装
+- [ ] アプリケーションレベルフィルタリングの削除
+
+#### Phase 4-4: ファイルタイプ別検索機能（優先度：中）
+
+**TODO**:
+
+- [ ] `search_rag` MCPツールに`fileType`パラメータを追加
+- [ ] "content", "settings", "both"の選択肢を実装
+- [ ] 適切なエラーハンドリングとバリデーション
+
+#### Phase 4-5: テストとドキュメント更新（優先度：低）
+
+**TODO**:
+
+- [ ] 新機能のテストケース追加
+- [ ] 既存テストの更新（一部対応済み）
+- [ ] MCPツールドキュメントの更新
+
+### 8.5 Phase 4 進捗状況（2025-01-16）
+
+**完了済み**:
+- Phase 4-1: NovelRepositoryベースのファイル検索ロジック実装完了
+- Phase 4-2: ChunkクラスへのfileTypeプロパティ追加とpayloadインデックス設定完了
+
+**現在の状況**:
+- 基本機能の実装は完了
+- 一部テストが失敗中（indexer.test.ts）- NovelRepositoryモックの設定が必要
+- 次の段階: Phase 4-3の事前フィルタリング実装
+
+**申し送り事項**:
+- `src/indexer.test.ts`のテストを修正する必要がある
+- NovelRepositoryのモックを適切に設定し、新しいファイル検索ロジックに対応したテストケースに更新
+- ChunkクラスのコンストラクタにfileTypeパラメータが追加されたため、他のテストファイルでも同様の修正が必要
+
+### 8.4 実装詳細
+
+#### 8.4.1 Indexerの改善
+
+```typescript
+// 現在の実装（非効率）
+const files = await findFilesRecursively(novelPath, ['md', 'txt']);
+
+// 改善後（効率的）
+const project = await this.novelRepository.getProject(novelId);
+const settingsFiles = await this.getFilesFromDirectories(
+  project.config.settingsDirectories,
+  'settings',
+);
+const contentFiles = await this.getFilesFromDirectories(
+  project.config.contentDirectories,
+  'content',
+);
+```
+
+#### 8.4.2 Qdrantクエリの最適化
+
+```typescript
+// 現在（非効率）
+const vectorResults = await this.vectorRepository.searchVectors(
+  this.config.collectionName,
+  queryEmbedding,
+  k,
+  this.config.scoreThreshold,
+);
+const filteredResults = vectorResults.filter((result) => result.payload?.novelId === novelId);
+
+// 改善後（効率的）
+const vectorResults = await this.vectorRepository.searchVectors(
+  this.config.collectionName,
+  queryEmbedding,
+  k,
+  this.config.scoreThreshold,
+  {
+    must: [
+      { key: 'novelId', match: { value: novelId } },
+      { key: 'fileType', match: { value: fileType } },
+    ],
+  },
+);
+```
+
+---
+
+## 9. 開発時の注意事項
 
 - 全てのファイル操作は絶対パスを使用
 - 厳格な ESLint ルール（警告0個必須）
@@ -443,4 +601,4 @@ novels/
 
 ---
 
-_Phase 3 実装インストラクション（2025-01-15）_
+_Phase 4 実装インストラクション（2025-01-16）_

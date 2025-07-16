@@ -105,6 +105,9 @@ export class QdrantVectorRepository implements VectorRepository {
           },
         });
         logger.info(`Collection created: ${collectionName}`);
+
+        // payloadインデックスを設定
+        await this.createPayloadIndexes(collectionName);
       } else {
         logger.debug(`Collection already exists: ${collectionName}`);
       }
@@ -115,6 +118,41 @@ export class QdrantVectorRepository implements VectorRepository {
         collectionName,
         error as Error,
       );
+    }
+  }
+
+  /**
+   * payloadインデックスの作成
+   * @param collectionName コレクション名
+   */
+  private async createPayloadIndexes(collectionName: string): Promise<void> {
+    try {
+      // novelIdのインデックスを作成（高選択性）
+      await this.client.createPayloadIndex(collectionName, {
+        field_name: 'novelId',
+        field_schema: 'keyword',
+      });
+      logger.info(`Created payload index for novelId in collection: ${collectionName}`);
+
+      // fileTypeのインデックスを作成（中選択性）
+      await this.client.createPayloadIndex(collectionName, {
+        field_name: 'fileType',
+        field_schema: 'keyword',
+      });
+      logger.info(`Created payload index for fileType in collection: ${collectionName}`);
+
+      // relativeFilePathのインデックスを作成（高選択性）
+      await this.client.createPayloadIndex(collectionName, {
+        field_name: 'relativeFilePath',
+        field_schema: 'keyword',
+      });
+      logger.info(`Created payload index for relativeFilePath in collection: ${collectionName}`);
+    } catch (error) {
+      logger.error(
+        `Failed to create payload indexes for collection: ${collectionName}`,
+        error as Error,
+      );
+      // インデックス作成失敗は致命的ではないため、エラーを投げない
     }
   }
 

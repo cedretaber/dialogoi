@@ -124,6 +124,7 @@ export class VectorBackend extends SearchBackend {
           endLine: chunk.endLine,
           chunkIndex: chunk.chunkIndex,
           novelId: chunk.novelId,
+          fileType: chunk.fileType,
           tags: chunk.tags,
           baseId: chunk.baseId,
           hash: chunk.hash,
