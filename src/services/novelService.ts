@@ -109,20 +109,37 @@ export class NovelService {
     return this.novelRepository.getSettingsContent(novelId, filename);
   }
 
-  async searchNovelSettings(
+  /**
+   * 統合テキスト検索（キーワード・正規表現）
+   * @param novelId 小説ID
+   * @param keyword 検索キーワード
+   * @param useRegex 正規表現として検索するか
+   * @param fileType 検索対象ファイルタイプ（"content" | "settings" | "both"）
+   * @returns 検索結果
+   */
+  async searchNovelText(
     novelId: string,
     keyword: string,
     useRegex: boolean = false,
+    fileType: 'content' | 'settings' | 'both' = 'both',
   ): Promise<Array<{ filename: string; matchingLines: string[] }>> {
-    return this.searchService.searchSettingsFiles(novelId, keyword, { useRegex });
-  }
+    const results: Array<{ filename: string; matchingLines: string[] }> = [];
 
-  async searchNovelContent(
-    novelId: string,
-    keyword: string,
-    useRegex: boolean = false,
-  ): Promise<Array<{ filename: string; matchingLines: string[] }>> {
-    return this.searchService.searchContentFiles(novelId, keyword, { useRegex });
+    if (fileType === 'settings' || fileType === 'both') {
+      const settingsResults = await this.searchService.searchSettingsFiles(novelId, keyword, {
+        useRegex,
+      });
+      results.push(...settingsResults);
+    }
+
+    if (fileType === 'content' || fileType === 'both') {
+      const contentResults = await this.searchService.searchContentFiles(novelId, keyword, {
+        useRegex,
+      });
+      results.push(...contentResults);
+    }
+
+    return results;
   }
 
   async getNovelContent(novelId: string, filename?: string): Promise<string> {

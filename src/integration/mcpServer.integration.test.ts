@@ -258,8 +258,7 @@ describe('MCP Server Integration Tests', () => {
       const toolNames = result.tools.map((tool) => tool.name);
       expect(toolNames).toContain('list_novel_projects');
       expect(toolNames).toContain('list_novel_settings');
-      expect(toolNames).toContain('search_novel_settings');
-      expect(toolNames).toContain('search_novel_content');
+      expect(toolNames).toContain('search_novel_text');
       expect(toolNames).toContain('search_rag');
     });
   });
@@ -330,17 +329,46 @@ describe('MCP Server Integration Tests', () => {
       expect(result.content[0].text).toContain('sample_novel');
     });
 
-    it('設定ファイル検索が正常に動作する', async () => {
+    it('統合テキスト検索（search_novel_text）が正常に動作する', async () => {
       const callToolMessage = {
         jsonrpc: '2.0',
         id: getNextMessageId(),
         method: 'tools/call',
         params: {
-          name: 'search_novel_settings',
+          name: 'search_novel_text',
           arguments: {
             novelId: 'sample_novel',
             keyword: '主人公',
             useRegex: false,
+            fileType: 'both',
+          },
+        },
+      };
+
+      sendMessage(callToolMessage);
+      const response = await waitForResponse();
+
+      expect(response.jsonrpc).toBe('2.0');
+      expect(response.result).toBeDefined();
+      const result = response.result as { content: Array<{ type: string; text: string }> };
+      expect(result.content).toBeDefined();
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('## テキストファイル検索結果');
+      expect(result.content[0].text).toContain('主人公');
+    });
+
+    it('search_novel_text設定ファイル検索のみが正常に動作する', async () => {
+      const callToolMessage = {
+        jsonrpc: '2.0',
+        id: getNextMessageId(),
+        method: 'tools/call',
+        params: {
+          name: 'search_novel_text',
+          arguments: {
+            novelId: 'sample_novel',
+            keyword: 'キャラクター',
+            useRegex: false,
+            fileType: 'settings',
           },
         },
       };
@@ -354,7 +382,89 @@ describe('MCP Server Integration Tests', () => {
       expect(result.content).toBeDefined();
       expect(result.content[0].type).toBe('text');
       expect(result.content[0].text).toContain('## 設定ファイル検索結果');
-      expect(result.content[0].text).toContain('主人公');
+      expect(result.content[0].text).toContain('キャラクター');
+    });
+
+    it('search_novel_text本文ファイル検索のみが正常に動作する', async () => {
+      const callToolMessage = {
+        jsonrpc: '2.0',
+        id: getNextMessageId(),
+        method: 'tools/call',
+        params: {
+          name: 'search_novel_text',
+          arguments: {
+            novelId: 'sample_novel',
+            keyword: 'chapter',
+            useRegex: false,
+            fileType: 'content',
+          },
+        },
+      };
+
+      sendMessage(callToolMessage);
+      const response = await waitForResponse();
+
+      expect(response.jsonrpc).toBe('2.0');
+      expect(response.result).toBeDefined();
+      const result = response.result as { content: Array<{ type: string; text: string }> };
+      expect(result.content).toBeDefined();
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('## 本文ファイル検索結果');
+      expect(result.content[0].text).toContain('chapter');
+    });
+
+    it('search_novel_text正規表現検索が正常に動作する', async () => {
+      const callToolMessage = {
+        jsonrpc: '2.0',
+        id: getNextMessageId(),
+        method: 'tools/call',
+        params: {
+          name: 'search_novel_text',
+          arguments: {
+            novelId: 'sample_novel',
+            keyword: '主人公|キャラクター',
+            useRegex: true,
+            fileType: 'both',
+          },
+        },
+      };
+
+      sendMessage(callToolMessage);
+      const response = await waitForResponse();
+
+      expect(response.jsonrpc).toBe('2.0');
+      expect(response.result).toBeDefined();
+      const result = response.result as { content: Array<{ type: string; text: string }> };
+      expect(result.content).toBeDefined();
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('## テキストファイル検索結果');
+      expect(result.content[0].text).toContain('正規表現');
+    });
+
+    it('search_novel_textデフォルト動作（fileType未指定）が正常に動作する', async () => {
+      const callToolMessage = {
+        jsonrpc: '2.0',
+        id: getNextMessageId(),
+        method: 'tools/call',
+        params: {
+          name: 'search_novel_text',
+          arguments: {
+            novelId: 'sample_novel',
+            keyword: 'test',
+            useRegex: false,
+          },
+        },
+      };
+
+      sendMessage(callToolMessage);
+      const response = await waitForResponse();
+
+      expect(response.jsonrpc).toBe('2.0');
+      expect(response.result).toBeDefined();
+      const result = response.result as { content: Array<{ type: string; text: string }> };
+      expect(result.content).toBeDefined();
+      expect(result.content[0].type).toBe('text');
+      expect(result.content[0].text).toContain('## テキストファイル検索結果');
     });
 
     it('RAG検索が正常に動作する', async () => {
@@ -498,17 +608,46 @@ describe('MCP Server Integration Tests', () => {
       expect(text).toMatch(/```[\s\S]*?```/);
     });
 
-    it('検索結果のMarkdown形式が正しい', async () => {
+    it('search_novel_text統合検索結果のMarkdown形式が正しい', async () => {
       const callToolMessage = {
         jsonrpc: '2.0',
         id: getNextMessageId(),
         method: 'tools/call',
         params: {
-          name: 'search_novel_settings',
+          name: 'search_novel_text',
           arguments: {
             novelId: 'sample_novel',
             keyword: '主人公',
             useRegex: false,
+            fileType: 'both',
+          },
+        },
+      };
+
+      sendMessage(callToolMessage);
+      const response = await waitForResponse();
+
+      const result = response.result as { content: Array<{ type: string; text: string }> };
+      const text = result.content[0].text;
+      expect(text).toMatch(/^## テキストファイル検索結果/);
+      expect(text).toMatch(/\*\*プロジェクト:\*\* sample_novel/);
+      expect(text).toMatch(/\*\*クエリ:\*\* 主人公/);
+      expect(text).toMatch(/\*\*検索タイプ:\*\* キーワード/);
+      expect(text).toMatch(/\*\*結果数:\*\* \d+/);
+    });
+
+    it('search_novel_text設定ファイル検索結果のMarkdown形式が正しい', async () => {
+      const callToolMessage = {
+        jsonrpc: '2.0',
+        id: getNextMessageId(),
+        method: 'tools/call',
+        params: {
+          name: 'search_novel_text',
+          arguments: {
+            novelId: 'sample_novel',
+            keyword: 'キャラクター',
+            useRegex: false,
+            fileType: 'settings',
           },
         },
       };
@@ -520,8 +659,36 @@ describe('MCP Server Integration Tests', () => {
       const text = result.content[0].text;
       expect(text).toMatch(/^## 設定ファイル検索結果/);
       expect(text).toMatch(/\*\*プロジェクト:\*\* sample_novel/);
-      expect(text).toMatch(/\*\*クエリ:\*\* 主人公/);
+      expect(text).toMatch(/\*\*クエリ:\*\* キャラクター/);
       expect(text).toMatch(/\*\*検索タイプ:\*\* キーワード/);
+      expect(text).toMatch(/\*\*結果数:\*\* \d+/);
+    });
+
+    it('search_novel_text正規表現検索結果のMarkdown形式が正しい', async () => {
+      const callToolMessage = {
+        jsonrpc: '2.0',
+        id: getNextMessageId(),
+        method: 'tools/call',
+        params: {
+          name: 'search_novel_text',
+          arguments: {
+            novelId: 'sample_novel',
+            keyword: '主人公|キャラクター',
+            useRegex: true,
+            fileType: 'both',
+          },
+        },
+      };
+
+      sendMessage(callToolMessage);
+      const response = await waitForResponse();
+
+      const result = response.result as { content: Array<{ type: string; text: string }> };
+      const text = result.content[0].text;
+      expect(text).toMatch(/^## テキストファイル検索結果/);
+      expect(text).toMatch(/\*\*プロジェクト:\*\* sample_novel/);
+      expect(text).toMatch(/\*\*クエリ:\*\* 主人公\|キャラクター/);
+      expect(text).toMatch(/\*\*検索タイプ:\*\* 正規表現/);
       expect(text).toMatch(/\*\*結果数:\*\* \d+/);
     });
   });

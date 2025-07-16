@@ -54,16 +54,16 @@ const listNovelSettingsInput = z.object({
   novelId: z.string().describe('小説のID'),
 });
 
-const searchNovelSettingsInput = z.object({
+const searchNovelTextInput = z.object({
   novelId: z.string().describe('小説のID'),
   keyword: z.string().describe('検索キーワード（正規表現も可能）'),
   useRegex: z.boolean().optional().describe('正規表現として検索するかどうか（デフォルト: false）'),
-});
-
-const searchNovelContentInput = z.object({
-  novelId: z.string().describe('小説のID'),
-  keyword: z.string().describe('検索キーワード（正規表現も可能）'),
-  useRegex: z.boolean().optional().describe('正規表現として検索するかどうか（デフォルト: false）'),
+  fileType: z
+    .enum(['content', 'settings', 'both'])
+    .optional()
+    .describe(
+      '検索対象のファイルタイプ (content: 本文, settings: 設定, both: 両方) (デフォルト: both)',
+    ),
 });
 
 const getNovelSettingsInput = z.object({
@@ -85,61 +85,6 @@ server.registerTool(
         '設定ファイル一覧',
         params.novelId,
         settingsList,
-      );
-
-      return {
-        content: [{ type: 'text' as const, text: result }],
-      };
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
-      return {
-        content: [{ type: 'text' as const, text: `Error: ${errorMsg}` }],
-      };
-    }
-  },
-);
-
-// 小説の設定ファイルを検索するツール
-server.registerTool(
-  'search_novel_settings',
-  {
-    description: '小説の設定ファイルからキーワードを検索します（正規表現検索も可能）',
-    inputSchema: searchNovelSettingsInput.shape,
-  },
-  async (params: { novelId: string; keyword: string; useRegex?: boolean }) => {
-    try {
-      const searchResults = await novelService.searchNovelSettings(
-        params.novelId,
-        params.keyword,
-        params.useRegex || false,
-      );
-
-      const searchType = MarkdownFormatterService.getSearchType(params.useRegex);
-
-      if (searchResults.length === 0) {
-        const emptyMessage = MarkdownFormatterService.generateEmptySearchMessage(
-          searchType,
-          params.keyword,
-          '設定ファイル',
-        );
-        const result = MarkdownFormatterService.formatEmptySearchResults(
-          '設定ファイル検索結果',
-          params.novelId,
-          params.keyword,
-          searchType,
-          emptyMessage,
-        );
-        return {
-          content: [{ type: 'text' as const, text: result }],
-        };
-      }
-
-      const result = MarkdownFormatterService.formatSearchResults(
-        '設定ファイル検索結果',
-        params.novelId,
-        params.keyword,
-        searchType,
-        searchResults,
       );
 
       return {
@@ -177,31 +122,40 @@ server.registerTool(
   },
 );
 
-// 小説の本文ファイルを検索するツール
+// 統合テキスト検索ツール
 server.registerTool(
-  'search_novel_content',
+  'search_novel_text',
   {
-    description: '小説の本文ファイルからキーワードを検索します（正規表現検索も可能）',
-    inputSchema: searchNovelContentInput.shape,
+    description:
+      'プロジェクト内のテキストファイルからキーワードを検索します（正規表現検索も可能）。ファイルタイプ別フィルタリング（本文/設定/両方）に対応しています。',
+    inputSchema: searchNovelTextInput.shape,
   },
-  async (params: { novelId: string; keyword: string; useRegex?: boolean }) => {
+  async (params: {
+    novelId: string;
+    keyword: string;
+    useRegex?: boolean;
+    fileType?: 'content' | 'settings' | 'both';
+  }) => {
     try {
-      const searchResults = await novelService.searchNovelContent(
+      const fileType = params.fileType || 'both';
+      const searchResults = await novelService.searchNovelText(
         params.novelId,
         params.keyword,
         params.useRegex || false,
+        fileType,
       );
 
       const searchType = MarkdownFormatterService.getSearchType(params.useRegex);
+      const fileTypeLabel = getFileTypeLabel(fileType);
 
       if (searchResults.length === 0) {
         const emptyMessage = MarkdownFormatterService.generateEmptySearchMessage(
           searchType,
           params.keyword,
-          '本文ファイル',
+          fileTypeLabel,
         );
         const result = MarkdownFormatterService.formatEmptySearchResults(
-          '本文ファイル検索結果',
+          `${fileTypeLabel}検索結果`,
           params.novelId,
           params.keyword,
           searchType,
@@ -213,7 +167,7 @@ server.registerTool(
       }
 
       const result = MarkdownFormatterService.formatSearchResults(
-        '本文ファイル検索結果',
+        `${fileTypeLabel}検索結果`,
         params.novelId,
         params.keyword,
         searchType,
@@ -231,6 +185,22 @@ server.registerTool(
     }
   },
 );
+
+/**
+ * ファイルタイプのラベルを取得
+ */
+function getFileTypeLabel(fileType: 'content' | 'settings' | 'both'): string {
+  switch (fileType) {
+    case 'content':
+      return '本文ファイル';
+    case 'settings':
+      return '設定ファイル';
+    case 'both':
+      return 'テキストファイル';
+    default:
+      return 'テキストファイル';
+  }
+}
 
 const listNovelProjectsInput = z.object({});
 

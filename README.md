@@ -190,20 +190,23 @@ node dist/index.js --project-root ./my-novels --max-tokens 600 --docker-enabled 
 - `novelId`: 小説のID
 - `filename`: ファイル名（省略時は全設定ファイルを結合）
 
-#### 4. `search_novel_settings`
+#### 4. `search_novel_text` 🔍 **統合テキスト検索**
 
-設定ファイル内をキーワード検索（正規表現検索も可能）
+プロジェクト内のテキストファイルからキーワードを検索します（正規表現検索も可能）
 
 **パラメータ:**
 
 - `novelId`: 小説のID
 - `keyword`: 検索キーワード（正規表現も可能）
 - `useRegex`: 正規表現として検索するか（デフォルト: false）
+- `fileType`: 検索対象のファイルタイプ（`content`, `settings`, `both`）（デフォルト: `both`）
 
 **使用例:**
 
-- "魔法システムについて調べて"
-- "正規表現で `魔法|魔術` を含む設定を探して"
+- "魔法システムについて調べて" (全体検索)
+- "設定ファイルから魔法について調べて" (`fileType: "settings"`)
+- "本文から主人公の名前が出てくる箇所を探して" (`fileType: "content"`)
+- "正規表現で `魔法|魔術` を含む設定を探して" (`useRegex: true, fileType: "settings"`)
 
 #### 5. `add_novel_setting`
 
@@ -238,22 +241,7 @@ node dist/index.js --project-root ./my-novels --max-tokens 600 --docker-enabled 
 - `novelId`: 小説のID
 - `filename`: ファイル名（省略時は全本文ファイルを結合）
 
-#### 8. `search_novel_content`
-
-本文ファイル内をキーワード検索（正規表現検索も可能）
-
-**パラメータ:**
-
-- `novelId`: 小説のID
-- `keyword`: 検索キーワード（正規表現も可能）
-- `useRegex`: 正規表現として検索するか（デフォルト: false）
-
-**使用例:**
-
-- "主人公の名前が出てくる箇所を探して"
-- "正規表現で `悲しい|寂しい|辛い` な感情表現を探して"
-
-#### 9. `add_novel_content`
+#### 8. `add_novel_content`
 
 本文ファイルを新規作成
 
@@ -267,7 +255,7 @@ node dist/index.js --project-root ./my-novels --max-tokens 600 --docker-enabled 
 
 **使用例:** "新しい章を追加して"
 
-#### 10. `list_novel_instructions`
+#### 9. `list_novel_instructions`
 
 小説プロジェクト内の指示ファイル一覧とプレビューを取得（デフォルトは DIALOGOI.md）
 
@@ -275,7 +263,7 @@ node dist/index.js --project-root ./my-novels --max-tokens 600 --docker-enabled 
 
 - `novelId`: 小説のID
 
-#### 11. `get_novel_instructions`
+#### 10. `get_novel_instructions`
 
 指示ファイルの内容を取得（filename を省略すると複数ファイルを結合）
 
@@ -286,7 +274,7 @@ node dist/index.js --project-root ./my-novels --max-tokens 600 --docker-enabled 
 
 ### RAG検索機能
 
-#### 12. `search_rag` 🔍 **高度な全文検索**
+#### 11. `search_rag` 🔍 **高度な全文検索**
 
 プロジェクト全体から関連テキストチャンクをRAG検索
 
@@ -298,6 +286,7 @@ node dist/index.js --project-root ./my-novels --max-tokens 600 --docker-enabled 
 - `fileType`: 検索対象のファイルタイプ（`content`, `settings`, `both`）（省略時: `both`）
 
 **使用例:**
+
 - "主人公が魔法を使うシーン" (全体検索)
 - "設定ファイルから魔法システムについて調べて" (`fileType: "settings"`)
 - "本文から感情表現を探して" (`fileType: "content"`)
@@ -440,13 +429,13 @@ Claude Desktopでの実際の使用例：
 
 ```
 4. "魔法システムについて設定ファイルから調べて"
-   → search_novel_settings で魔法関連の設定を検索
+   → search_novel_text で fileType="settings" を指定して魔法関連の設定を検索
 
 5. "主人公が出てくる場面を本文から探して"
-   → search_novel_content で主人公の登場箇所を検索
+   → search_novel_text で fileType="content" を指定して主人公の登場箇所を検索
 
 6. "正規表現で感情表現を探して"
-   → search_novel_content で useRegex=true として `悲しい|寂しい|辛い` を検索
+   → search_novel_text で useRegex=true として `悲しい|寂しい|辛い` を検索
 
 7. "主人公が魔法を使うシーンを詳しく探して"
    → search_rag でプロジェクト全体をRAG検索（高度な検索）
@@ -455,14 +444,14 @@ Claude Desktopでの実際の使用例：
 ### ファイル作成機能
 
 ```
-6. "新しいキャラクター設定ファイルを作成して"
+8. "新しいキャラクター設定ファイルを作成して"
    → add_novel_setting で設定ファイルを安全に作成
 
-7. "第3章を新しく書き始めたいので空のファイルを作って"
+9. "第3章を新しく書き始めたいので空のファイルを作って"
    → add_novel_content で本文ファイルを新規作成
 
-8. "既存の設定ファイルを更新したい（上書き許可）"
-   → add_novel_setting with overwrite=true で安全な上書き
+10. "既存の設定ファイルを更新したい（上書き許可）"
+    → add_novel_setting with overwrite=true で安全な上書き
 ```
 
 ## 開発
