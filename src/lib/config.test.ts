@@ -97,6 +97,13 @@ describe('Config Loader', () => {
         defaultK: 5,
         maxK: 30,
       },
+      docker: {
+        qdrant: {
+          containerName: 'dialogoi-qdrant',
+          image: 'qdrant/qdrant',
+          port: 6333,
+        },
+      },
     });
   });
 
@@ -139,6 +146,13 @@ describe('Config Loader', () => {
       search: {
         defaultK: 10,
         maxK: 50,
+      },
+      docker: {
+        qdrant: {
+          containerName: 'dialogoi-qdrant',
+          image: 'qdrant/qdrant',
+          port: 6333,
+        },
       },
     });
   });

@@ -53,6 +53,13 @@ describe('IndexerManager', () => {
           autoCleanup: true,
         },
       },
+      docker: {
+        qdrant: {
+          containerName: 'test-qdrant',
+          image: 'qdrant/qdrant',
+          port: 6333,
+        },
+      },
       vector: {
         collectionName: 'test-collection',
         scoreThreshold: 0.7,

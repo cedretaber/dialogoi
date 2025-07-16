@@ -12,11 +12,15 @@ import { loadConfig } from './lib/config.js';
 import { MarkdownFormatterService } from './services/MarkdownFormatterService.js';
 import { SearchBackendUnavailableError } from './errors/DialogoiError.js';
 import { LoggerFactory } from './logging/index.js';
+// import { spawn } from 'child_process'; // 新設計では不要
 
 dotenv.config();
 
 // ログレベルを環境変数から設定
 LoggerFactory.setGlobalLogger(LoggerFactory.createLogger(LoggerFactory.getLogLevelFromEnv()));
+
+// グローバルなクリーンアップ実行フラグ
+let cleanupExecuted = false;
 
 // Dialogoi設定を読み込み（コマンドライン引数の上書きも適用される）
 const dialogoiConfig = loadConfig();
@@ -565,35 +569,8 @@ server.registerTool(
   },
 );
 
-async function main() {
-  // Graceful shutdown処理を最初に登録
-  const gracefulShutdownHook = (signal: string) => {
-    console.error(`🛑 ${signal}シグナルを受信しました。MCPサーバーを停止します...`);
-
-    // 非同期処理を実行し、完了後にプロセスを終了
-    novelService
-      .cleanup()
-      .then(() => {
-        console.error('✅ クリーンアップが完了しました');
-        process.exit(0);
-      })
-      .catch((error) => {
-        console.error('❌ クリーンアップに失敗しました:', error);
-        process.exit(1);
-      });
-
-    // タイムアウトで強制終了（バックアップ）
-    setTimeout(() => {
-      console.error('⚠️  クリーンアップがタイムアウトしました。強制終了します');
-      process.exit(1);
-    }, 10 * 1000);
-  };
-
-  process.on('SIGINT', () => gracefulShutdownHook('SIGINT'));
-  process.on('SIGTERM', () => gracefulShutdownHook('SIGTERM'));
-
-  console.error('🔧 SIGINTとSIGTERMハンドラーを登録しました');
-
+// 非同期初期化処理を実行する関数
+const executeInitialization = async (): Promise<void> => {
   // NovelService内でIndexerManagerが初期化済み（各小説プロジェクトのIndexerは最初のリクエスト時に作成）
   console.error('🔍 NovelServiceを初期化しました（小説プロジェクト別のIndexerは遅延作成）');
 
@@ -618,9 +595,189 @@ async function main() {
     console.error('❌ ファイル監視の開始に失敗しました:', error);
   }
 
-  // Step 3: MCPサーバーを開始
+  console.error('✅ アプリケーションの初期化が完了しました');
+};
+
+// MCPサーバーの初期化ハンドラーを設定
+server.server.oninitialized = () => {
+  console.error('🔧 MCPサーバーが初期化されました。アプリケーションの初期化を開始します...');
+
+  // 初期化完了フラグを設定
+  let initializationCompleted = false;
+  let initializationError: Error | null = null;
+
+  // 非同期初期化処理を実行
+  executeInitialization()
+    .then(() => {
+      initializationCompleted = true;
+    })
+    .catch((error) => {
+      initializationCompleted = true;
+      initializationError = error;
+      console.error('❌ アプリケーションの初期化で予期しないエラーが発生しました:', error);
+    });
+
+  // 同期的に初期化完了を待機（最大30秒）
+  const maxWaitTime = 30000; // 30秒
+  const checkInterval = 100; // 100ms間隔
+  const startTime = Date.now();
+
+  while (!initializationCompleted && Date.now() - startTime < maxWaitTime) {
+    // 100ms待機して再チェック（同期的なビジーウェイト）
+    const waitStart = Date.now();
+    while (Date.now() - waitStart < checkInterval) {
+      // 同期的な待機
+    }
+  }
+
+  if (!initializationCompleted) {
+    console.error('⚠️  アプリケーションの初期化がタイムアウトしました（30秒）');
+  } else if (initializationError) {
+    console.error('❌ アプリケーションの初期化でエラーが発生しました:', initializationError);
+  }
+};
+
+/**
+ * 統一されたクリーンアップ処理
+ * @param source クリーンアップの実行元
+ * @returns クリーンアップが実行されたかどうか
+ */
+const executeCleanup = async (source: string): Promise<boolean> => {
+  if (cleanupExecuted) {
+    console.error(`🔄 ${source}: クリーンアップは既に実行済みです`);
+    return false;
+  }
+
+  console.error(`🧹 ${source}からクリーンアップを実行します...`);
+  cleanupExecuted = true;
+
+  try {
+    await novelService.cleanup();
+    console.error(`✅ ${source}: クリーンアップが完了しました`);
+    return true;
+  } catch (error) {
+    console.error(`❌ ${source}: クリーンアップに失敗しました:`, error);
+    return false;
+  }
+};
+
+// MCPサーバーのクローズハンドラーを設定
+server.server.onclose = () => {
+  console.error('🛑 MCPサーバーの接続が閉じられました');
+
+  // 統一されたクリーンアップ処理を実行
+  let cleanupCompleted = false;
+  let cleanupError: Error | null = null;
+
+  executeCleanup('MCP onclose')
+    .then((executed) => {
+      cleanupCompleted = true;
+      if (executed) {
+        console.error('✅ MCP onclose: クリーンアップが完了しました');
+      }
+    })
+    .catch((error) => {
+      cleanupCompleted = true;
+      cleanupError = error;
+      console.error('❌ MCP onclose: クリーンアップでエラーが発生しました:', error);
+    });
+
+  // 同期的にクリーンアップ完了を待機（最大3秒）
+  const maxWaitTime = 3000;
+  const checkInterval = 50;
+  const startTime = Date.now();
+
+  while (!cleanupCompleted && Date.now() - startTime < maxWaitTime) {
+    const waitStart = Date.now();
+    while (Date.now() - waitStart < checkInterval) {
+      // 同期的な待機
+    }
+  }
+
+  if (!cleanupCompleted) {
+    console.error('⚠️  MCP onclose: クリーンアップがタイムアウトしました（3秒）');
+  } else if (cleanupError) {
+    console.error('❌ MCP onclose: クリーンアップでエラーが発生しました:', cleanupError);
+  }
+};
+
+console.error('🔧 MCPサーバーハンドラーを設定しました');
+
+const handleProcessShutdown = async (signal: string) => {
+  console.error(`🛑 プロセスシグナル ${signal} を受信しました`);
+
+  try {
+    const executed = await executeCleanup(`プロセスシグナル ${signal}`);
+    if (executed) {
+      console.error(`✅ プロセスシグナル ${signal}: クリーンアップが完了しました`);
+    }
+  } catch (error) {
+    console.error(`❌ プロセスシグナル ${signal}: クリーンアップでエラーが発生しました:`, error);
+  }
+
+  console.error(`🏁 プロセスシグナル ${signal} 処理完了、プロセスを終了します`);
+  process.exit(0);
+};
+
+// SIGINT (Ctrl+C) とSIGTERM のハンドラーを設定
+process.on('SIGINT', () => handleProcessShutdown('SIGINT'));
+process.on('SIGTERM', () => handleProcessShutdown('SIGTERM'));
+
+// プロセス終了時の最終的なクリーンアップ（新設計：Docker停止なし）
+process.on('beforeExit', () => {
+  console.error('🛑 beforeExit イベントが発生しました');
+
+  if (cleanupExecuted) {
+    console.error('🔄 beforeExit: クリーンアップは既に実行済みです');
+    return;
+  }
+
+  console.error('🛑 beforeExit: 新設計により、Dockerコンテナは永続的に利用されます');
+  cleanupExecuted = true;
+});
+
+// プロセス終了時の緊急クリーンアップ
+process.on('exit', (code) => {
+  console.error(`🏁 プロセス終了 (code: ${code})`);
+
+  if (!cleanupExecuted) {
+    console.error('⚠️  通常のクリーンアップが実行されませんでした');
+  }
+});
+
+// エラーハンドリング
+process.on('uncaughtException', (error) => {
+  console.error('❌ uncaughtException:', error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ unhandledRejection:', reason, 'at', promise);
+});
+
+console.error('🔧 シャットダウンハンドラーを設定しました');
+
+async function main() {
+  // MCPサーバーを開始
   console.error('🔍 MCPサーバーを開始します...');
   const transport = new StdioServerTransport();
+
+  // stdin の 'end' イベントを監視してシャットダウンを検出
+  process.stdin.on('end', () => {
+    console.error('🛑 stdin 終了が検出されました');
+
+    executeCleanup('stdin 終了')
+      .then((executed) => {
+        if (executed) {
+          console.error('✅ stdin 終了: クリーンアップが完了しました');
+        }
+        process.exit(0);
+      })
+      .catch((error) => {
+        console.error('❌ stdin 終了: クリーンアップでエラーが発生しました:', error);
+        process.exit(1);
+      });
+  });
+
   await server.connect(transport);
   console.error('✅ Dialogoi MCP Server started');
 }

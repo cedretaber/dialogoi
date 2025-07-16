@@ -107,18 +107,35 @@ function sendNextMessage() {
     serverProcess.stdin.write(JSON.stringify(message) + '\n');
   } else {
     console.log('🎉 全テスト完了');
-    serverProcess.kill();
-    process.exit(0);
+    console.log('🛑 サーバーを正常終了します...');
+
+    // MCPプロトコルに従って適切にサーバーを終了
+    // stdin.end()でサーバーに終了を通知
+    serverProcess.stdin.end();
+
+    // サーバーが正常終了するまで少し待機
+    setTimeout(() => {
+      if (!serverProcess.killed) {
+        console.log('⚠️  サーバーが正常終了しなかったため、強制終了します');
+        serverProcess.kill();
+      }
+      process.exit(0);
+    }, 2000); // 2秒待機
   }
 }
 
-serverProcess.on('close', (code) => {
-  console.log(`📋 サーバー終了 (code: ${code})`);
+serverProcess.on('close', (code, signal) => {
+  console.log(`📋 サーバー終了 (code: ${code}, signal: ${signal})`);
+});
+
+serverProcess.on('exit', (code, signal) => {
+  console.log(`🚪 サーバープロセス終了 (code: ${code}, signal: ${signal})`);
 });
 
 // 10秒後にタイムアウト
 setTimeout(() => {
   console.log('⏰ タイムアウト');
+  console.log('🛑 サーバーを強制終了します...');
   serverProcess.kill();
   process.exit(1);
 }, 10000);

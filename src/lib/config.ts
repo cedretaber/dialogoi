@@ -26,6 +26,13 @@ export interface DialogoiConfig {
       autoCleanup: boolean;
     };
   };
+  docker: {
+    qdrant: {
+      containerName: string;
+      image: string;
+      port: number;
+    };
+  };
   vector: {
     collectionName: string;
     scoreThreshold: number;
@@ -60,6 +67,13 @@ const DEFAULT_CONFIG: DialogoiConfig = {
       image: 'qdrant/qdrant',
       timeout: 30000,
       autoCleanup: true,
+    },
+  },
+  docker: {
+    qdrant: {
+      containerName: 'dialogoi-qdrant',
+      image: 'qdrant/qdrant',
+      port: 6333,
     },
   },
   vector: {

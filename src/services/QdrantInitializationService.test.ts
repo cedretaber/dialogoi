@@ -4,14 +4,7 @@ import {
   QdrantInitializationResult,
 } from './QdrantInitializationService.js';
 import { DialogoiConfig } from '../lib/config.js';
-import { spawn, ChildProcess } from 'child_process';
-import { EventEmitter } from 'events';
-
-// モック用のChildProcessクラス
-class MockChildProcess extends EventEmitter {
-  public stdout = new EventEmitter();
-  public stderr = new EventEmitter();
-}
+import { spawn } from 'child_process';
 
 // child_process.spawn をモック
 vi.mock('child_process', () => ({
@@ -61,6 +54,13 @@ describe('QdrantInitializationService', () => {
           autoCleanup: true,
         },
       },
+      docker: {
+        qdrant: {
+          containerName: 'test-qdrant',
+          image: 'qdrant/qdrant',
+          port: 6333,
+        },
+      },
       vector: {
         collectionName: 'test-collection',
         scoreThreshold: 0.7,
@@ -79,7 +79,8 @@ describe('QdrantInitializationService', () => {
   describe('constructor', () => {
     it('設定でQdrantInitializationServiceが初期化される', () => {
       expect(service).toBeDefined();
-      expect(service.getActiveContainerId()).toBeUndefined();
+      // getActiveContainerIdメソッドは新設計では削除されたため、コメントアウト
+      // expect(service.getActiveContainerId()).toBeUndefined();
     });
   });
 
@@ -153,13 +154,15 @@ describe('QdrantInitializationService', () => {
 
   describe('tryDockerAutoStart', () => {
     it('ポートが使用中の場合、Docker起動を試行しない', async () => {
-      // lsof コマンドのモック（ポート使用中）
-      const mockProcess = new MockChildProcess();
-      vi.mocked(spawn).mockReturnValue(mockProcess as ChildProcess);
+      // DockerManagerのモック
+      const mockDockerManager = {
+        ensureQdrantContainer: vi.fn().mockResolvedValue(false),
+        waitForContainerHealth: vi.fn().mockResolvedValue(false),
+        getContainerInfo: vi.fn().mockResolvedValue(null),
+      };
 
-      setTimeout(() => {
-        mockProcess.emit('close', 0); // ポート使用中
-      }, 10);
+      (service as unknown as { dockerManager: typeof mockDockerManager }).dockerManager =
+        mockDockerManager;
 
       const result = await (
         service as unknown as {
@@ -173,25 +176,19 @@ describe('QdrantInitializationService', () => {
 
       expect(result.success).toBe(false);
       expect(result.mode).toBe('docker');
-      expect(result.error?.message).toContain('ポート6333は既に使用中です');
+      expect(result.error?.message).toContain('Qdrantコンテナの確保に失敗しました');
     });
 
     it('Docker権限がない場合、Docker起動を試行しない', async () => {
-      // lsof コマンドのモック（ポート未使用）
-      const mockLsofProcess = new MockChildProcess();
-      vi.mocked(spawn).mockReturnValueOnce(mockLsofProcess as ChildProcess);
+      // DockerManagerのモック
+      const mockDockerManager = {
+        ensureQdrantContainer: vi.fn().mockResolvedValue(false),
+        waitForContainerHealth: vi.fn().mockResolvedValue(false),
+        getContainerInfo: vi.fn().mockResolvedValue(null),
+      };
 
-      setTimeout(() => {
-        mockLsofProcess.emit('close', 1); // ポート未使用
-      }, 10);
-
-      // docker version コマンドのモック（権限なし）
-      const mockDockerProcess = new MockChildProcess();
-      vi.mocked(spawn).mockReturnValueOnce(mockDockerProcess as ChildProcess);
-
-      setTimeout(() => {
-        mockDockerProcess.emit('close', 1); // Docker権限なし
-      }, 10);
+      (service as unknown as { dockerManager: typeof mockDockerManager }).dockerManager =
+        mockDockerManager;
 
       const result = await (
         service as unknown as {
@@ -205,51 +202,19 @@ describe('QdrantInitializationService', () => {
 
       expect(result.success).toBe(false);
       expect(result.mode).toBe('docker');
-      expect(result.error?.message).toContain('Docker権限がありません');
+      expect(result.error?.message).toContain('Qdrantコンテナの確保に失敗しました');
     });
 
     it('Dockerコンテナ起動に成功し、ヘルスチェックが通過する場合、dockerモードで成功する', async () => {
-      // lsof コマンドのモック（ポート未使用）
-      const mockLsofProcess = new MockChildProcess();
-      vi.mocked(spawn).mockReturnValueOnce(mockLsofProcess as ChildProcess);
+      // DockerManagerのモック（成功ケース）
+      const mockDockerManager = {
+        ensureQdrantContainer: vi.fn().mockResolvedValue(true),
+        waitForContainerHealth: vi.fn().mockResolvedValue(true),
+        getContainerInfo: vi.fn().mockResolvedValue({ id: 'container-id-123' }),
+      };
 
-      setTimeout(() => {
-        mockLsofProcess.emit('close', 1); // ポート未使用
-      }, 10);
-
-      // docker version コマンドのモック（権限あり）
-      const mockDockerVersionProcess = new MockChildProcess();
-      vi.mocked(spawn).mockReturnValueOnce(mockDockerVersionProcess as ChildProcess);
-
-      setTimeout(() => {
-        mockDockerVersionProcess.emit('close', 0); // Docker権限あり
-      }, 10);
-
-      // docker run コマンドのモック（コンテナ起動成功）
-      const mockDockerRunProcess = new MockChildProcess();
-      vi.mocked(spawn).mockReturnValueOnce(mockDockerRunProcess as ChildProcess);
-
-      setTimeout(() => {
-        mockDockerRunProcess.stdout.emit('data', 'container-id-123\n');
-        mockDockerRunProcess.emit('close', 0); // コンテナ起動成功
-      }, 10);
-
-      // docker ps コマンドのモック（コンテナ状態確認）
-      const mockDockerPsProcess = new MockChildProcess();
-      vi.mocked(spawn).mockReturnValueOnce(mockDockerPsProcess as ChildProcess);
-
-      setTimeout(() => {
-        mockDockerPsProcess.stdout.emit(
-          'data',
-          'NAMES\tSTATUS\tPORTS\ntest-container\tUp 5 seconds\t0.0.0.0:6333->6333/tcp\n',
-        );
-        mockDockerPsProcess.emit('close', 0); // コンテナ状態確認成功
-      }, 10);
-
-      // fetch のモック（ヘルスチェック成功）
-      vi.mocked(fetch).mockResolvedValue({
-        ok: true,
-      } as Response);
+      (service as unknown as { dockerManager: typeof mockDockerManager }).dockerManager =
+        mockDockerManager;
 
       // QdrantVectorRepository のモック
       const mockRepository = {
@@ -279,21 +244,11 @@ describe('QdrantInitializationService', () => {
 
   describe('cleanup', () => {
     it('アクティブなコンテナがある場合、クリーンアップを実行する', async () => {
-      // アクティブなコンテナIDを設定
-      (service as unknown as { activeContainerId: string }).activeContainerId = 'test-container-id';
-
-      // docker rm コマンドのモック
-      const mockDockerRmProcess = new EventEmitter();
-      vi.mocked(spawn).mockReturnValue(mockDockerRmProcess as ChildProcess);
-
-      setTimeout(() => {
-        mockDockerRmProcess.emit('close', 0); // クリーンアップ成功
-      }, 10);
-
+      // 新設計では永続的なコンテナを使用するため、クリーンアップは行わない
       await service.cleanup();
 
-      expect(vi.mocked(spawn)).toHaveBeenCalledWith('docker', ['rm', '-f', 'test-container-id']);
-      expect(service.getActiveContainerId()).toBeUndefined();
+      // spawnが呼ばれていないことを確認
+      expect(vi.mocked(spawn)).not.toHaveBeenCalled();
     });
 
     it('アクティブなコンテナがない場合、何もしない', async () => {

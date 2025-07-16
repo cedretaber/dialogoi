@@ -59,7 +59,20 @@ export class NovelService {
    * クリーンアップ処理（Docker コンテナ等のリソースを含む）
    */
   async cleanup(): Promise<void> {
-    await this.searchService.cleanup();
+    // タイムアウト付きでクリーンアップを実行（最大2秒）
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      setTimeout(() => reject(new Error('クリーンアップがタイムアウトしました')), 2000);
+    });
+
+    try {
+      await Promise.race([this.searchService.cleanup(), timeoutPromise]);
+    } catch (error) {
+      this.logger.error(
+        'クリーンアップでエラーが発生しました:',
+        error instanceof Error ? error : new Error(String(error)),
+      );
+      // エラーが発生してもプロセスを継続
+    }
   }
 
   /**
