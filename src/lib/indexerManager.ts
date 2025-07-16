@@ -100,15 +100,27 @@ export class IndexerManager {
    * @returns 検索結果
    */
   async search(novelId: string, query: string, k: number): Promise<SearchResult[]> {
-    // Qdrant 初期化を確認
-    const initResult = await this.initializeQdrant();
+    // Qdrant 初期化を確認（未初期化の場合のみ実行）
+    if (!this.initializationResult) {
+      const initResult = await this.initializeQdrant();
+      if (!initResult.success) {
+        this.logger.warn('Qdrant が利用できません。空の結果を返します', {
+          novelId,
+          query,
+          mode: initResult.mode,
+          error: initResult.error?.message,
+        });
+        return [];
+      }
+    }
 
-    if (!initResult.success) {
+    // 既に初期化されているが失敗していた場合
+    if (this.initializationResult && !this.initializationResult.success) {
       this.logger.warn('Qdrant が利用できません。空の結果を返します', {
         novelId,
         query,
-        mode: initResult.mode,
-        error: initResult.error?.message,
+        mode: this.initializationResult.mode,
+        error: this.initializationResult.error?.message,
       });
       return [];
     }

@@ -34,22 +34,35 @@ export class QdrantInitializationService {
   async initialize(): Promise<QdrantInitializationResult> {
     logger.info('Qdrant 初期化を開始します');
 
-    // Phase 1: 明示的な接続先を試行
-    const explicitResult = await this.tryExplicitConnection();
-    if (explicitResult.success) {
-      logger.info('明示的な接続先への接続に成功しました');
-      return explicitResult;
+    // Phase 1: 明示的な接続先が設定されている場合のみ試行
+    if (this.config.qdrant.url) {
+      logger.info('明示的な接続先が設定されています', { url: this.config.qdrant.url });
+      const explicitResult = await this.tryExplicitConnection();
+      if (explicitResult.success) {
+        logger.info('明示的な接続先への接続に成功しました');
+        return explicitResult;
+      }
+      logger.info('明示的な接続先への接続に失敗しました', {
+        error: explicitResult.error?.message,
+      });
+    } else {
+      logger.info('明示的な接続先は設定されていません。Docker自動起動を試行します');
     }
 
     // Phase 2: Docker自動起動を試行
     if (this.config.qdrant.docker.enabled) {
+      logger.info('Docker自動起動を試行中...', { enabled: this.config.qdrant.docker.enabled });
       const dockerResult = await this.tryDockerAutoStart();
       if (dockerResult.success) {
         logger.info('Docker自動起動による接続に成功しました');
         return dockerResult;
+      } else {
+        logger.info('Docker自動起動に失敗しました', { error: dockerResult.error?.message });
       }
     } else {
-      logger.debug('Docker自動起動は無効化されています');
+      logger.info('Docker自動起動は無効化されています', {
+        enabled: this.config.qdrant.docker.enabled,
+      });
     }
 
     // Phase 3: フォールバック
@@ -58,7 +71,8 @@ export class QdrantInitializationService {
       success: false,
       mode: 'fallback',
       error: new DialogoiError('Qdrant接続に失敗しました', 'QDRANT_CONNECTION_FAILED', {
-        explicitError: explicitResult.error?.message,
+        hasExplicitUrl: !!this.config.qdrant.url,
+        dockerEnabled: this.config.qdrant.docker.enabled,
       }),
     };
   }
@@ -68,6 +82,14 @@ export class QdrantInitializationService {
    */
   private async tryExplicitConnection(): Promise<QdrantInitializationResult> {
     try {
+      if (!this.config.qdrant.url) {
+        return {
+          success: false,
+          mode: 'explicit',
+          error: new Error('明示的なURLが設定されていません'),
+        };
+      }
+
       logger.debug('明示的な接続先を試行中', { url: this.config.qdrant.url });
 
       const repository = new QdrantVectorRepository({
@@ -142,7 +164,7 @@ export class QdrantInitializationService {
 
       // 接続テスト
       const repository = new QdrantVectorRepository({
-        url: this.config.qdrant.url,
+        url: this.config.qdrant.url || 'http://localhost:6333', // Docker起動時はデフォルトポート
         apiKey: this.config.qdrant.apiKey,
         timeout: this.config.qdrant.timeout,
         defaultCollection: this.config.qdrant.collection,
@@ -212,7 +234,10 @@ export class QdrantInitializationService {
       const timestamp = Date.now();
       const containerName = `dialogoi-qdrant-${timestamp}`;
 
-      logger.debug('Qdrant Dockerコンテナを起動中', { containerName });
+      logger.debug('Qdrant Dockerコンテナを起動中', {
+        containerName,
+        image: this.config.qdrant.docker.image,
+      });
 
       const process = spawn('docker', [
         'run',
@@ -238,14 +263,14 @@ export class QdrantInitializationService {
       process.on('close', (code) => {
         if (code === 0) {
           const containerId = stdout.trim();
-          logger.debug('Qdrant Dockerコンテナを起動しました', { containerId });
+          logger.debug('Qdrant Dockerコンテナを起動しました', { containerId, containerName });
           resolve(containerId);
         } else {
           logger.error(
             'Qdrant Dockerコンテナの起動に失敗しました',
-            new Error(`Docker起動に失敗しました: ${stderr}`),
+            new Error(`Docker起動に失敗しました (終了コード: ${code}): ${stderr}`),
           );
-          reject(new Error(`Docker起動に失敗しました: ${stderr}`));
+          reject(new Error(`Docker起動に失敗しました (終了コード: ${code}): ${stderr}`));
         }
       });
 
@@ -262,28 +287,95 @@ export class QdrantInitializationService {
   private async waitForQdrantHealth(containerId: string): Promise<boolean> {
     const maxWaitTime = this.config.qdrant.docker.timeout;
     const startTime = Date.now();
+    const healthUrl = `${this.config.qdrant.url || 'http://localhost:6333'}/healthz`;
 
-    logger.debug('Qdrantヘルスチェック待機中', { containerId, maxWaitTime });
+    logger.debug('Qdrantヘルスチェック待機中', {
+      containerId,
+      maxWaitTime,
+      healthUrl,
+    });
 
+    let attemptCount = 0;
     while (Date.now() - startTime < maxWaitTime) {
+      attemptCount++;
+      const elapsedTime = Date.now() - startTime;
+
       try {
+        // コンテナの状態を確認
+        await this.checkContainerStatus(containerId);
+
         // シンプルなHTTPヘルスチェック
-        const response = await fetch(`${this.config.qdrant.url}/health`);
+        const response = await fetch(healthUrl);
+        logger.debug('ヘルスチェック応答', {
+          attempt: attemptCount,
+          status: response.status,
+          ok: response.ok,
+          elapsedTime,
+        });
+
         if (response.ok) {
-          logger.debug('Qdrantヘルスチェックに成功しました');
+          logger.debug('Qdrantヘルスチェックに成功しました', { attemptCount, elapsedTime });
           return true;
         }
       } catch (error) {
         // 接続エラーは想定内なので、デバッグログのみ
-        logger.debug('Qdrantヘルスチェック試行中...', { error: (error as Error).message });
+        logger.debug('Qdrantヘルスチェック試行中...', {
+          attempt: attemptCount,
+          error: (error as Error).message,
+          elapsedTime,
+        });
       }
 
       // 1秒待機
       await new Promise((resolve) => setTimeout(resolve, 1000));
     }
 
-    logger.debug('Qdrantヘルスチェックがタイムアウトしました');
+    logger.debug('Qdrantヘルスチェックがタイムアウトしました', {
+      totalAttempts: attemptCount,
+      totalTime: Date.now() - startTime,
+    });
     return false;
+  }
+
+  /**
+   * Dockerコンテナの状態を確認
+   */
+  private async checkContainerStatus(containerId: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const process = spawn('docker', [
+        'ps',
+        '--filter',
+        `id=${containerId}`,
+        '--format',
+        'table {{.Names}}\t{{.Status}}\t{{.Ports}}',
+      ]);
+
+      let stdout = '';
+      let stderr = '';
+
+      process.stdout.on('data', (data) => {
+        stdout += data.toString();
+      });
+
+      process.stderr.on('data', (data) => {
+        stderr += data.toString();
+      });
+
+      process.on('close', (code) => {
+        if (code === 0) {
+          logger.debug('コンテナ状態確認', { containerId, status: stdout.trim() });
+          resolve();
+        } else {
+          logger.debug('コンテナ状態確認失敗', { containerId, stderr });
+          reject(new Error(`Container status check failed: ${stderr}`));
+        }
+      });
+
+      process.on('error', (error) => {
+        logger.debug('コンテナ状態確認エラー', { containerId, error: error.message });
+        reject(error);
+      });
+    });
   }
 
   /**

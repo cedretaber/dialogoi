@@ -1,7 +1,7 @@
 # Dialogoi ― 実装インストラクション
 
-> **現在のフェーズ**: Phase 3-4 - FlexSearch廃止とアーキテクチャ簡素化
-> **最終更新**: 2025-01-15
+> **現在のフェーズ**: Phase 3-5 完了 - Qdrant初期化戦略実装とDocker自動起動
+> **最終更新**: 2025-01-16
 
 ---
 
@@ -256,12 +256,12 @@ interface QdrantConfig {
 - [x] 不要な依存関係を package.json から削除
 - [x] テストの更新と実行
 
-#### Phase 3-5: 設定と初期化戦略（優先度：中）
+#### Phase 3-5: 設定と初期化戦略（優先度：中）✅ **完了**
 
-- [ ] Qdrant 接続の初期化戦略実装
-- [ ] Docker 自動起動機能の実装
-- [ ] フォールバック機能の実装
-- [ ] 包括的なテストの作成
+- [x] Qdrant 接続の初期化戦略実装
+- [x] Docker 自動起動機能の実装
+- [x] フォールバック機能の実装
+- [x] 包括的なテストの作成
 
 ---
 
@@ -294,6 +294,69 @@ interface QdrantConfig {
 
 - `IndexerSearchService` 経由で `VectorBackend` を呼び出す
 - フォールバック時のエラーハンドリングを実装
+
+---
+
+### Phase 3-5 実装詳細
+
+#### 3-5.1 QdrantInitializationService の実装
+
+**段階的初期化戦略:**
+
+```typescript
+export class QdrantInitializationService {
+  async initialize(): Promise<QdrantInitializationResult>;
+  private async tryExplicitConnection(): Promise<QdrantInitializationResult>;
+  private async tryDockerAutoStart(): Promise<QdrantInitializationResult>;
+  private async startQdrantContainer(): Promise<string>;
+  private async waitForQdrantHealth(containerId: string): Promise<boolean>;
+  async cleanup(): Promise<void>;
+}
+```
+
+**実装された初期化フロー:**
+
+1. **Phase 1**: 明示的接続（localhost:6333）の試行
+2. **Phase 2**: Docker自動起動とヘルスチェック
+3. **Phase 3**: フォールバック（キーワード検索のみ）
+
+#### 3-5.2 Docker自動起動機能
+
+**主要機能:**
+- ポート使用状況チェック（6333番ポート）
+- Docker権限の事前確認
+- タイムスタンプ付きコンテナ名での起動
+- `/healthz` エンドポイントでのヘルスチェック
+- グレースフル終了時のコンテナ自動削除
+
+**セキュリティ対応:**
+- Docker権限がない場合の安全なフォールバック
+- 不正なポート使用の防止
+- コンテナのライフサイクル管理
+
+#### 3-5.3 設定の拡張
+
+```typescript
+interface QdrantConfig {
+  url: string;
+  apiKey?: string;
+  collection: string;
+  timeout: number;
+  docker: {
+    enabled: boolean;
+    image: string;
+    timeout: number;
+    autoCleanup: boolean;
+  };
+}
+```
+
+#### 3-5.4 エラーハンドリングとフォールバック
+
+- Qdrant接続失敗時の graceful degradation
+- 詳細なデバッグログ出力
+- ユーザーフレンドリーなエラーメッセージ
+- 既存の文字列検索機能への自動フォールバック
 
 ---
 
@@ -351,7 +414,8 @@ novels/
 **開始日**: 2025-01-15
 **Phase 3-3 完了日**: 2025-01-15
 **Phase 3-4 完了日**: 2025-01-15
-**目標完了日**: 2025-01-18
+**Phase 3-5 完了日**: 2025-01-16
+**プロジェクト完了日**: 2025-01-16
 
 **進捗追跡**: 各フェーズ完了時に INSTRUCTION.md を更新
 

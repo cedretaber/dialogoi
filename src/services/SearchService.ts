@@ -68,4 +68,14 @@ export interface SearchService {
    * ファイル監視の状態を取得
    */
   isFileWatching(): boolean;
+
+  /**
+   * 検索バックエンドを初期化（サーバー起動時に呼び出し）
+   */
+  initialize(): Promise<void>;
+
+  /**
+   * クリーンアップ処理（Docker コンテナ等のリソースを含む）
+   */
+  cleanup(): Promise<void>;
 }

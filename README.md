@@ -259,7 +259,7 @@ novels/
 ### 開発・メンテナンス
 
 - **型安全性**: TypeScript strictモード、危険な型アサーション除去
-- **テスト駆動**: 211個のテストケース、継続的品質管理
+- **テスト駆動**: 220個のテストケース、継続的品質管理
 - **ベクトル検索**: Qdrant統合による高精度意味検索
 
 ## 前提条件
@@ -268,7 +268,24 @@ novels/
 
 RAG検索機能を使用するには、Qdrant サーバーが必要です。
 
-**推奨方法（Docker）:**
+#### 自動起動機能（推奨）
+
+Dialogoi には **Docker自動起動機能** が内蔵されており、Qdrant サーバーがない場合に自動でDockerコンテナを起動します：
+
+```bash
+# 設定不要 - Dialogoi起動時に自動でQdrantコンテナが起動されます
+npm run dev
+```
+
+**自動起動の動作:**
+1. **明示的接続の試行**: localhost:6333 への接続を試行
+2. **Docker自動起動**: 接続失敗時、自動的に `qdrant/qdrant` コンテナを起動
+3. **ヘルスチェック**: コンテナ起動後、接続可能になるまで待機（最大30秒）
+4. **グレースフル終了**: プロセス終了時に起動したコンテナを自動削除
+
+#### 手動でのQdrant起動
+
+手動でQdrantサーバーを管理したい場合：
 
 ```bash
 # Qdrant サーバーを起動
@@ -278,21 +295,33 @@ docker run -p 6333:6333 qdrant/qdrant
 docker run -d -p 6333:6333 --name dialogoi-qdrant qdrant/qdrant
 ```
 
-**設定（config/dialogoi.config.json）:**
+#### 設定（config/dialogoi.config.json）
 
 ```json
 {
   "qdrant": {
     "url": "http://localhost:6333",
     "collection": "dialogoi-chunks",
-    "timeout": 5000
+    "timeout": 5000,
+    "docker": {
+      "enabled": true,
+      "image": "qdrant/qdrant",
+      "timeout": 30000,
+      "autoCleanup": true
+    }
   }
 }
 ```
 
-**フォールバック機能:**
+**Docker自動起動の設定オプション:**
+- `enabled`: Docker自動起動の有効/無効（デフォルト: true）
+- `image`: 使用するDockerイメージ（デフォルト: "qdrant/qdrant"）
+- `timeout`: ヘルスチェックのタイムアウト（デフォルト: 30秒）
+- `autoCleanup`: 終了時のコンテナ自動削除（デフォルト: true）
 
-Qdrant サーバーが利用できない場合、従来の文字列検索・正規表現検索のみで動作します。
+#### フォールバック機能
+
+Qdrant サーバーが利用できない場合、従来の文字列検索・正規表現検索のみで動作します。Docker権限がない環境でも安全に動作します。
 
 ## 使用例
 
@@ -375,9 +404,9 @@ npm run format      # Prettier フォーマット
 
 - ✅ Phase 1完了（統一エラーハンドリング・ロギング・型安全性向上）
 - ✅ Phase 2完了（Repositoryパターン・検索サービス分離・依存性注入）
-- ✅ Phase 3完了（Qdrant統合・ベクトル検索・FlexSearch廃止）
+- ✅ Phase 3完了（Qdrant統合・ベクトル検索・FlexSearch廃止・Docker自動起動）
 
-全体進捗: 90%
+全体進捗: 100% 🎉
 
 ## ライセンス
 

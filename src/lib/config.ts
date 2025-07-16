@@ -15,7 +15,7 @@ export interface DialogoiConfig {
     batchSize: number;
   };
   qdrant: {
-    url: string;
+    url?: string; // 明示的に設定された場合のみ接続試行
     apiKey?: string;
     collection: string;
     timeout: number;
@@ -52,7 +52,7 @@ const DEFAULT_CONFIG: DialogoiConfig = {
     batchSize: 32,
   },
   qdrant: {
-    url: 'http://localhost:6333',
+    url: undefined, // ユーザが明示的に設定した場合のみ接続試行
     collection: 'dialogoi-chunks',
     timeout: 5000,
     docker: {

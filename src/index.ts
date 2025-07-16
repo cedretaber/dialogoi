@@ -10,8 +10,12 @@ import { IndexerManager } from './lib/indexerManager.js';
 import path from 'path';
 import { loadConfig } from './lib/config.js';
 import { MarkdownFormatterService } from './services/MarkdownFormatterService.js';
+import { LoggerFactory } from './logging/index.js';
 
 dotenv.config();
+
+// ログレベルを環境変数から設定
+LoggerFactory.setGlobalLogger(LoggerFactory.createLogger(LoggerFactory.getLogLevelFromEnv()));
 
 // Dialogoi設定を読み込み（コマンドライン引数の上書きも適用される）
 const dialogoiConfig = loadConfig();
@@ -35,16 +39,6 @@ const indexerManager = new IndexerManager(dialogoiConfig);
 const searchService = new IndexerSearchService(novelRepository, indexerManager);
 const fileOperationsService = new IndexerFileOperationsService(novelRepository, indexerManager);
 const novelService = new NovelService(novelRepository, searchService, fileOperationsService);
-
-// ファイル監視を開始
-(async () => {
-  try {
-    await novelService.startFileWatching();
-    console.error('🚀 ファイル監視が開始されました');
-  } catch (error) {
-    console.error('❌ ファイル監視の開始に失敗しました:', error);
-  }
-})();
 
 const server = new McpServer({
   name: 'Dialogoi',
@@ -550,36 +544,63 @@ server.registerTool(
 );
 
 async function main() {
+  // Graceful shutdown処理を最初に登録
+  const gracefulShutdownHook = (signal: string) => {
+    console.error(`🛑 ${signal}シグナルを受信しました。MCPサーバーを停止します...`);
+
+    // 非同期処理を実行し、完了後にプロセスを終了
+    novelService
+      .cleanup()
+      .then(() => {
+        console.error('✅ クリーンアップが完了しました');
+        process.exit(0);
+      })
+      .catch((error) => {
+        console.error('❌ クリーンアップに失敗しました:', error);
+        process.exit(1);
+      });
+
+    // タイムアウトで強制終了（バックアップ）
+    setTimeout(() => {
+      console.error('⚠️  クリーンアップがタイムアウトしました。強制終了します');
+      process.exit(1);
+    }, 10 * 1000);
+  };
+
+  process.on('SIGINT', () => gracefulShutdownHook('SIGINT'));
+  process.on('SIGTERM', () => gracefulShutdownHook('SIGTERM'));
+
+  console.error('🔧 SIGINTとSIGTERMハンドラーを登録しました');
+
   // NovelService内でIndexerManagerが初期化済み（各小説プロジェクトのIndexerは最初のリクエスト時に作成）
   console.error('🔍 NovelServiceを初期化しました（小説プロジェクト別のIndexerは遅延作成）');
 
+  // Step 1: 検索バックエンドを初期化
+  console.error('🔍 検索バックエンドの初期化を開始します...');
+  try {
+    await novelService.initialize();
+    console.error('✅ 検索バックエンドの初期化が完了しました');
+  } catch (error) {
+    console.error(
+      '⚠️  検索バックエンドの初期化でエラーが発生しましたが、サーバーを継続します:',
+      error,
+    );
+  }
+
+  // Step 2: ファイル監視を開始（検索バックエンド初期化後）
+  console.error('🔍 ファイル監視を開始します...');
+  try {
+    await novelService.startFileWatching();
+    console.error('🚀 ファイル監視が開始されました');
+  } catch (error) {
+    console.error('❌ ファイル監視の開始に失敗しました:', error);
+  }
+
+  // Step 3: MCPサーバーを開始
+  console.error('🔍 MCPサーバーを開始します...');
   const transport = new StdioServerTransport();
-
-  // Graceful shutdown処理
-  process.on('SIGINT', async () => {
-    console.error('🛑 MCPサーバーを停止します...');
-    try {
-      await novelService.stopFileWatching();
-      console.error('✅ ファイル監視を停止しました');
-    } catch (error) {
-      console.error('❌ ファイル監視の停止に失敗しました:', error);
-    }
-    process.exit(0);
-  });
-
-  process.on('SIGTERM', async () => {
-    console.error('🛑 MCPサーバーを停止します...');
-    try {
-      await novelService.stopFileWatching();
-      console.error('✅ ファイル監視を停止しました');
-    } catch (error) {
-      console.error('❌ ファイル監視の停止に失敗しました:', error);
-    }
-    process.exit(0);
-  });
-
   await server.connect(transport);
-  console.error('Dialogoi MCP Server started');
+  console.error('✅ Dialogoi MCP Server started');
 }
 
 main().catch((error) => {

@@ -120,7 +120,7 @@ describe('Config Loader', () => {
         batchSize: 32,
       },
       qdrant: {
-        url: 'http://localhost:6333',
+        url: undefined,
         collection: 'dialogoi-chunks',
         timeout: 5000,
         docker: {

@@ -140,9 +140,9 @@ export interface CollectionInfo {
  */
 export interface VectorRepositoryConfig {
   /**
-   * データベースサーバーのURL
+   * データベースサーバーのURL（未設定の場合はDocker自動起動）
    */
-  url: string;
+  url?: string;
 
   /**
    * APIキー（オプション）

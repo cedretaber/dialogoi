@@ -1,13 +1,8 @@
 {
-  "vector": "none",
   "projectRoot": "./novels",
   "chunk": {
     "maxTokens": 400,
     "overlap": 0.2
-  },
-  "flex": {
-    "profile": "fast",
-    "exportPath": "./cache/index.json"
   },
   "search": {
     "defaultK": 10,

@@ -48,7 +48,7 @@ describe('QdrantInitializationService', () => {
         batchSize: 32,
       },
       qdrant: {
-        url: 'http://localhost:6333',
+        url: undefined, // デフォルトではURL未設定
         collection: 'test-collection',
         timeout: 5000,
         docker: {
@@ -82,6 +82,10 @@ describe('QdrantInitializationService', () => {
 
   describe('initialize', () => {
     it('明示的な接続が成功した場合、explicitモードで成功する', async () => {
+      // 明示的なURL設定を追加
+      mockConfig.qdrant.url = 'http://localhost:6333';
+      service = new QdrantInitializationService(mockConfig);
+
       // QdrantVectorRepository のモック
       const mockRepository = {
         connect: vi.fn().mockResolvedValue(undefined),
@@ -98,6 +102,12 @@ describe('QdrantInitializationService', () => {
     });
 
     it('明示的な接続が失敗し、Dockerが無効な場合、fallbackモードになる', async () => {
+      // 明示的なURL設定を追加
+      mockConfig.qdrant.url = 'http://localhost:6333';
+      // Docker無効の設定
+      mockConfig.qdrant.docker.enabled = false;
+      service = new QdrantInitializationService(mockConfig);
+
       // QdrantVectorRepository のモック（接続失敗）
       const mockRepository = {
         connect: vi.fn().mockRejectedValue(new Error('Connection failed')),
@@ -106,9 +116,16 @@ describe('QdrantInitializationService', () => {
 
       MockQdrantVectorRepository.mockImplementation(() => mockRepository);
 
-      // Docker無効の設定
-      mockConfig.qdrant.docker.enabled = false;
-      service = new QdrantInitializationService(mockConfig);
+      const result = await service.initialize();
+
+      expect(result.success).toBe(false);
+      expect(result.mode).toBe('fallback');
+      expect(result.error).toBeDefined();
+    });
+
+    it('URL未設定の場合、直接Docker自動起動を試行する', async () => {
+      // URL未設定のまま（デフォルト状態）
+      expect(mockConfig.qdrant.url).toBeUndefined();
 
       const result = await service.initialize();
 
@@ -199,6 +216,18 @@ describe('QdrantInitializationService', () => {
       setTimeout(() => {
         mockDockerRunProcess.stdout.emit('data', 'container-id-123\n');
         mockDockerRunProcess.emit('close', 0); // コンテナ起動成功
+      }, 10);
+
+      // docker ps コマンドのモック（コンテナ状態確認）
+      const mockDockerPsProcess = new MockChildProcess();
+      vi.mocked(spawn).mockReturnValueOnce(mockDockerPsProcess as ChildProcess);
+
+      setTimeout(() => {
+        mockDockerPsProcess.stdout.emit(
+          'data',
+          'NAMES\tSTATUS\tPORTS\ntest-container\tUp 5 seconds\t0.0.0.0:6333->6333/tcp\n',
+        );
+        mockDockerPsProcess.emit('close', 0); // コンテナ状態確認成功
       }, 10);
 
       // fetch のモック（ヘルスチェック成功）

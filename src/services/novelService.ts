@@ -49,6 +49,20 @@ export class NovelService {
   }
 
   /**
+   * 検索バックエンドを初期化（サーバー起動時に呼び出し）
+   */
+  async initialize(): Promise<void> {
+    await this.searchService.initialize();
+  }
+
+  /**
+   * クリーンアップ処理（Docker コンテナ等のリソースを含む）
+   */
+  async cleanup(): Promise<void> {
+    await this.searchService.cleanup();
+  }
+
+  /**
    * ファイル監視の状態を取得
    */
   isFileWatching(): boolean {

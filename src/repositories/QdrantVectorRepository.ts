@@ -23,13 +23,16 @@ export class QdrantVectorRepository implements VectorRepository {
   private connectionState: boolean = false;
 
   constructor(private readonly config: VectorRepositoryConfig) {
+    // URL未設定の場合はデフォルトのlocalhostを使用
+    const url = config.url || 'http://localhost:6333';
+    
     this.client = new QdrantClient({
-      url: config.url,
+      url,
       apiKey: config.apiKey,
     });
 
     logger.info('QdrantVectorRepository initialized', {
-      url: config.url,
+      url,
       hasApiKey: !!config.apiKey,
       timeout: config.timeout,
     });

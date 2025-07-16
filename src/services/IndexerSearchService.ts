@@ -92,4 +92,26 @@ export class IndexerSearchService implements SearchService {
     }
     return this.indexerManager.isFileWatching();
   }
+
+  async initialize(): Promise<void> {
+    if (!this.indexerManager) {
+      throw new ConfigurationError(
+        'IndexerManager が設定されていません',
+        'INDEXER_MANAGER_NOT_CONFIGURED',
+      );
+    }
+    this.logger.info('検索バックエンド初期化開始（サーバー起動時）');
+    await this.indexerManager.initializeQdrant();
+  }
+
+  async cleanup(): Promise<void> {
+    if (!this.indexerManager) {
+      throw new ConfigurationError(
+        'IndexerManager が設定されていません',
+        'INDEXER_MANAGER_NOT_CONFIGURED',
+      );
+    }
+    this.logger.info('クリーンアップ処理開始');
+    await this.indexerManager.cleanup();
+  }
 }
