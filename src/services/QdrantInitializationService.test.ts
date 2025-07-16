@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { QdrantInitializationService } from './QdrantInitializationService.js';
+import {
+  QdrantInitializationService,
+  QdrantInitializationResult,
+} from './QdrantInitializationService.js';
 import { DialogoiConfig } from '../lib/config.js';
 import { spawn, ChildProcess } from 'child_process';
 import { EventEmitter } from 'events';
@@ -127,11 +130,24 @@ describe('QdrantInitializationService', () => {
       // URL未設定のまま（デフォルト状態）
       expect(mockConfig.qdrant.url).toBeUndefined();
 
+      // tryDockerAutoStartメソッドをスパイしてモック
+      const tryDockerAutoStartSpy = vi
+        .spyOn(
+          service as unknown as { tryDockerAutoStart: () => Promise<QdrantInitializationResult> },
+          'tryDockerAutoStart',
+        )
+        .mockResolvedValue({
+          success: false,
+          mode: 'fallback',
+          error: new Error('Docker not available in test environment'),
+        });
+
       const result = await service.initialize();
 
       expect(result.success).toBe(false);
       expect(result.mode).toBe('fallback');
       expect(result.error).toBeDefined();
+      expect(tryDockerAutoStartSpy).toHaveBeenCalled();
     });
   });
 

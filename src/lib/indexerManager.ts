@@ -6,6 +6,7 @@ import {
   QdrantInitializationService,
   QdrantInitializationResult,
 } from '../services/QdrantInitializationService.js';
+import { SearchBackendUnavailableError } from '../errors/DialogoiError.js';
 import { getLogger } from '../logging/index.js';
 
 /**
@@ -100,29 +101,67 @@ export class IndexerManager {
    * @returns 検索結果
    */
   async search(novelId: string, query: string, k: number): Promise<SearchResult[]> {
+    this.logger.debug('RAG検索開始', {
+      novelId,
+      query,
+      k,
+      hasInitializationResult: !!this.initializationResult,
+      initializationResultSuccess: this.initializationResult?.success,
+    });
+
     // Qdrant 初期化を確認（未初期化の場合のみ実行）
     if (!this.initializationResult) {
+      this.logger.warn('初期化結果が未設定のため、再初期化を実行します');
       const initResult = await this.initializeQdrant();
       if (!initResult.success) {
-        this.logger.warn('Qdrant が利用できません。空の結果を返します', {
+        this.logger.warn('Qdrant が利用できません。エラーをthrowします', {
           novelId,
           query,
           mode: initResult.mode,
           error: initResult.error?.message,
         });
-        return [];
+        throw new SearchBackendUnavailableError(
+          query,
+          'Qdrantベクターデータベースに接続できないため、セマンティック検索を実行できません',
+          {
+            novelId,
+            mode: initResult.mode,
+            error: initResult.error?.message,
+          },
+        );
       }
     }
 
     // 既に初期化されているが失敗していた場合
     if (this.initializationResult && !this.initializationResult.success) {
-      this.logger.warn('Qdrant が利用できません。空の結果を返します', {
+      this.logger.warn('Qdrant が利用できません。エラーをthrowします', {
         novelId,
         query,
         mode: this.initializationResult.mode,
         error: this.initializationResult.error?.message,
       });
-      return [];
+      throw new SearchBackendUnavailableError(
+        query,
+        'Qdrantベクターデータベースに接続できないため、セマンティック検索を実行できません',
+        {
+          novelId,
+          mode: this.initializationResult.mode,
+          error: this.initializationResult.error?.message,
+        },
+      );
+    }
+
+    // フォールバックモード用の早期リターン（テスト用途）
+    if (this.initializationResult?.mode === 'fallback') {
+      this.logger.debug('フォールバックモードのためエラーをthrowします', { novelId, query });
+      throw new SearchBackendUnavailableError(
+        query,
+        'Qdrantベクターデータベースに接続できないため、セマンティック検索を実行できません（フォールバックモード）',
+        {
+          novelId,
+          mode: this.initializationResult.mode,
+        },
+      );
     }
 
     await this.ensureNovelInitialized(novelId);

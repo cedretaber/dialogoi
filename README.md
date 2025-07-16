@@ -82,6 +82,85 @@ novels/
 - macOS: `~/Library/Application Support/Claude/claude_desktop_config.json`
 - Linux: `~/.config/Claude/claude_desktop_config.json`
 
+### コマンドライン引数
+
+Dialogoi MCPサーバーは、設定ファイルの値をコマンドライン引数で上書きできます：
+
+#### 基本設定
+
+```bash
+node dist/index.js [オプション]
+```
+
+**一般設定:**
+
+- `--project-root <PATH>` - 小説プロジェクトのルートディレクトリ（デフォルト: `./novels`）
+- `--base-dir <PATH>` - `--project-root` の別名（後方互換性）
+
+**チャンキング設定:**
+
+- `--max-tokens <NUMBER>` - チャンクの最大トークン数（デフォルト: 400）
+- `--overlap <NUMBER>` - チャンク間のオーバーラップ率（デフォルト: 0.2）
+
+**検索設定:**
+
+- `--default-k <NUMBER>` - デフォルトの検索結果数（デフォルト: 10）
+- `--max-k <NUMBER>` - 最大検索結果数（デフォルト: 50）
+
+#### Qdrant関連設定
+
+**接続設定:**
+
+- `--qdrant-url <URL>` - Qdrantサーバーの接続URL（未設定時はDocker自動起動）
+- `--qdrant-api-key <KEY>` - Qdrant APIキー（認証が必要な場合）
+- `--qdrant-collection <NAME>` - 使用するコレクション名（デフォルト: `dialogoi-chunks`）
+- `--qdrant-timeout <MS>` - 接続タイムアウト（ミリ秒、デフォルト: 5000）
+
+**Docker関連設定:**
+
+- `--docker-enabled <true|false>` - Docker自動起動の有効/無効（デフォルト: true）
+- `--docker-image <IMAGE>` - 使用するDockerイメージ名（デフォルト: `qdrant/qdrant`）
+- `--docker-timeout <MS>` - Docker起動タイムアウト（ミリ秒、デフォルト: 30000）
+- `--docker-auto-cleanup <true|false>` - プロセス終了時の自動削除（デフォルト: true）
+
+#### 使用例
+
+```bash
+# 特定のQdrant URLを指定してサーバーを起動
+node dist/index.js --qdrant-url http://custom-qdrant:6333
+
+# Docker無効でサーバーを起動（既存のQdrantサーバーのみ使用）
+node dist/index.js --docker-enabled false
+
+# カスタムコレクション名とタイムアウトを指定
+node dist/index.js --qdrant-collection my-collection --qdrant-timeout 10000
+
+# 複数設定を組み合わせ
+node dist/index.js --project-root ./my-novels --max-tokens 600 --docker-enabled false
+```
+
+#### Claude Desktop設定での使用
+
+```json
+{
+  "mcpServers": {
+    "dialogoi": {
+      "command": "node",
+      "args": [
+        "path/to/dialogoi/dist/index.js",
+        "--project-root",
+        "path/to/novels",
+        "--qdrant-url",
+        "http://localhost:6333",
+        "--docker-enabled",
+        "true"
+      ],
+      "cwd": "path/to/dialogoi"
+    }
+  }
+}
+```
+
 ## API一覧
 
 ### プロジェクト管理
@@ -278,6 +357,7 @@ npm run dev
 ```
 
 **自動起動の動作:**
+
 1. **明示的接続の試行**: localhost:6333 への接続を試行
 2. **Docker自動起動**: 接続失敗時、自動的に `qdrant/qdrant` コンテナを起動
 3. **ヘルスチェック**: コンテナ起動後、接続可能になるまで待機（最大30秒）
@@ -314,6 +394,7 @@ docker run -d -p 6333:6333 --name dialogoi-qdrant qdrant/qdrant
 ```
 
 **Docker自動起動の設定オプション:**
+
 - `enabled`: Docker自動起動の有効/無効（デフォルト: true）
 - `image`: 使用するDockerイメージ（デフォルト: "qdrant/qdrant"）
 - `timeout`: ヘルスチェックのタイムアウト（デフォルト: 30秒）

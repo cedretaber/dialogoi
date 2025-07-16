@@ -12,6 +12,36 @@ vi.mock('../backends/VectorBackend.js');
 vi.mock('../services/TransformersEmbeddingService.js');
 vi.mock('../repositories/QdrantVectorRepository.js');
 
+// QdrantInitializationServiceをモック化
+vi.mock('../services/QdrantInitializationService.js', () => ({
+  QdrantInitializationService: vi.fn().mockImplementation(() => ({
+    initialize: vi.fn().mockResolvedValue({
+      success: false,
+      mode: 'fallback',
+      error: new Error('Mocked: no Qdrant in test environment'),
+    }),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
+// IndexerManagerをモック化（QdrantInitializationServiceの実インスタンス化を防止）
+vi.mock('../lib/indexerManager.js', () => ({
+  IndexerManager: vi.fn().mockImplementation(() => ({
+    initializeQdrant: vi.fn().mockResolvedValue({
+      success: false,
+      mode: 'fallback',
+      error: new Error('Mocked: no Qdrant in test environment'),
+    }),
+    isQdrantAvailable: vi.fn().mockReturnValue(false),
+    search: vi.fn().mockResolvedValue([]),
+    updateFile: vi.fn().mockResolvedValue(undefined),
+    removeFile: vi.fn().mockResolvedValue(undefined),
+    startFileWatching: vi.fn().mockResolvedValue(undefined),
+    stopFileWatching: vi.fn().mockResolvedValue(undefined),
+    cleanup: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
 // Use the actual novels directory that exists in the repository
 const novelsDir = path.join(process.cwd(), 'novels');
 const config = loadConfig();

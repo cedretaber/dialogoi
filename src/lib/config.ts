@@ -124,6 +124,66 @@ function getCommandLineOverrides(): Partial<DialogoiConfig> {
           i++;
         }
         break;
+      case '--qdrant-url':
+        if (nextArg && !nextArg.startsWith('--')) {
+          if (!overrides.qdrant) overrides.qdrant = {};
+          overrides.qdrant.url = nextArg;
+          i++;
+        }
+        break;
+      case '--qdrant-api-key':
+        if (nextArg && !nextArg.startsWith('--')) {
+          if (!overrides.qdrant) overrides.qdrant = {};
+          overrides.qdrant.apiKey = nextArg;
+          i++;
+        }
+        break;
+      case '--qdrant-collection':
+        if (nextArg && !nextArg.startsWith('--')) {
+          if (!overrides.qdrant) overrides.qdrant = {};
+          overrides.qdrant.collection = nextArg;
+          i++;
+        }
+        break;
+      case '--qdrant-timeout':
+        if (nextArg && !nextArg.startsWith('--')) {
+          if (!overrides.qdrant) overrides.qdrant = {};
+          overrides.qdrant.timeout = parseInt(nextArg, 10);
+          i++;
+        }
+        break;
+      case '--docker-enabled':
+        if (nextArg && !nextArg.startsWith('--')) {
+          if (!overrides.qdrant) overrides.qdrant = {};
+          if (!overrides.qdrant.docker) overrides.qdrant.docker = {};
+          overrides.qdrant.docker.enabled = nextArg === 'true';
+          i++;
+        }
+        break;
+      case '--docker-image':
+        if (nextArg && !nextArg.startsWith('--')) {
+          if (!overrides.qdrant) overrides.qdrant = {};
+          if (!overrides.qdrant.docker) overrides.qdrant.docker = {};
+          overrides.qdrant.docker.image = nextArg;
+          i++;
+        }
+        break;
+      case '--docker-timeout':
+        if (nextArg && !nextArg.startsWith('--')) {
+          if (!overrides.qdrant) overrides.qdrant = {};
+          if (!overrides.qdrant.docker) overrides.qdrant.docker = {};
+          overrides.qdrant.docker.timeout = parseInt(nextArg, 10);
+          i++;
+        }
+        break;
+      case '--docker-auto-cleanup':
+        if (nextArg && !nextArg.startsWith('--')) {
+          if (!overrides.qdrant) overrides.qdrant = {};
+          if (!overrides.qdrant.docker) overrides.qdrant.docker = {};
+          overrides.qdrant.docker.autoCleanup = nextArg === 'true';
+          i++;
+        }
+        break;
     }
   }
 
@@ -164,7 +224,9 @@ export function loadConfig(configPath?: string): DialogoiConfig {
   }
 
   const defaultPath = path.join(process.cwd(), 'config', 'dialogoi.config.json');
-  const targetPath = configPath || defaultPath;
+  // 環境変数での設定ファイル指定をサポート（テスト用）
+  const envConfigPath = process.env.DIALOGOI_CONFIG_PATH;
+  const targetPath = configPath || envConfigPath || defaultPath;
 
   let fileConfig: Partial<DialogoiConfig> = {};
 

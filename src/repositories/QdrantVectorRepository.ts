@@ -25,7 +25,7 @@ export class QdrantVectorRepository implements VectorRepository {
   constructor(private readonly config: VectorRepositoryConfig) {
     // URL未設定の場合はデフォルトのlocalhostを使用
     const url = config.url || 'http://localhost:6333';
-    
+
     this.client = new QdrantClient({
       url,
       apiKey: config.apiKey,

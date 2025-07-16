@@ -5,7 +5,8 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['src/integration/**/*.test.ts'],
-    testTimeout: 30000, // 統合テストは時間がかかる場合があるので長めに設定
+    testTimeout: 20000, // 統合テストのタイムアウト
+    hookTimeout: 25000, // beforeEach/afterEachフックのタイムアウト（サーバークリーンアップの10秒タイムアウト + さらに余裕を持たせる）
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

@@ -197,6 +197,59 @@ describe('Config Loader', () => {
     expect(config.projectRoot).toBe('./legacy-novels');
   });
 
+  it('should override Qdrant config with command line arguments', () => {
+    // Qdrant関連のコマンドライン引数を設定
+    process.argv.push('--qdrant-url', 'http://custom:6333');
+    process.argv.push('--qdrant-api-key', 'test-api-key');
+    process.argv.push('--qdrant-collection', 'custom-collection');
+    process.argv.push('--qdrant-timeout', '10000');
+
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error('File not found');
+    });
+
+    const config = loadConfig();
+
+    expect(config.qdrant.url).toBe('http://custom:6333');
+    expect(config.qdrant.apiKey).toBe('test-api-key');
+    expect(config.qdrant.collection).toBe('custom-collection');
+    expect(config.qdrant.timeout).toBe(10000);
+  });
+
+  it('should override Docker config with command line arguments', () => {
+    // Docker関連のコマンドライン引数を設定
+    process.argv.push('--docker-enabled', 'false');
+    process.argv.push('--docker-image', 'custom/qdrant:latest');
+    process.argv.push('--docker-timeout', '60000');
+    process.argv.push('--docker-auto-cleanup', 'false');
+
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error('File not found');
+    });
+
+    const config = loadConfig();
+
+    expect(config.qdrant.docker.enabled).toBe(false);
+    expect(config.qdrant.docker.image).toBe('custom/qdrant:latest');
+    expect(config.qdrant.docker.timeout).toBe(60000);
+    expect(config.qdrant.docker.autoCleanup).toBe(false);
+  });
+
+  it('should handle boolean CLI arguments correctly', () => {
+    // Boolean引数のテスト
+    process.argv.push('--docker-enabled', 'true');
+    process.argv.push('--docker-auto-cleanup', 'false');
+
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error('File not found');
+    });
+
+    const config = loadConfig();
+
+    expect(config.qdrant.docker.enabled).toBe(true);
+    expect(config.qdrant.docker.autoCleanup).toBe(false);
+  });
+
   it('should cache loaded config', () => {
     const mockConfig = JSON.stringify({ vector: 'none' });
     vi.mocked(fs.readFileSync).mockReturnValue(mockConfig);

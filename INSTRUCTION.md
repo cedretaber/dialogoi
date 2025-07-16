@@ -323,6 +323,7 @@ export class QdrantInitializationService {
 #### 3-5.2 Docker自動起動機能
 
 **主要機能:**
+
 - ポート使用状況チェック（6333番ポート）
 - Docker権限の事前確認
 - タイムスタンプ付きコンテナ名での起動
@@ -330,6 +331,7 @@ export class QdrantInitializationService {
 - グレースフル終了時のコンテナ自動削除
 
 **セキュリティ対応:**
+
 - Docker権限がない場合の安全なフォールバック
 - 不正なポート使用の防止
 - コンテナのライフサイクル管理

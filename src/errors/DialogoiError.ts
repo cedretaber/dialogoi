@@ -157,6 +157,21 @@ export class InvalidSearchQueryError extends SearchError {
 }
 
 /**
+ * 検索バックエンド利用不可エラー
+ */
+export class SearchBackendUnavailableError extends SearchError {
+  constructor(query: string, reason: string, context?: Record<string, unknown>) {
+    super(`検索バックエンドが利用できません: "${query}" - ${reason}`, 'SEARCH_BACKEND_UNAVAILABLE', {
+      query,
+      reason,
+      ...context,
+    });
+    this.name = 'SearchBackendUnavailableError';
+    Object.setPrototypeOf(this, SearchBackendUnavailableError.prototype);
+  }
+}
+
+/**
  * ファイル関連エラー
  */
 export class FileError extends DialogoiError {

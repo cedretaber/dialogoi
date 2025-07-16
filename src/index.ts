@@ -10,6 +10,7 @@ import { IndexerManager } from './lib/indexerManager.js';
 import path from 'path';
 import { loadConfig } from './lib/config.js';
 import { MarkdownFormatterService } from './services/MarkdownFormatterService.js';
+import { SearchBackendUnavailableError } from './errors/DialogoiError.js';
 import { LoggerFactory } from './logging/index.js';
 
 dotenv.config();
@@ -535,6 +536,26 @@ server.registerTool(
       };
     } catch (error) {
       console.error('❌ RAG検索エラー:', error);
+      
+      if (error instanceof SearchBackendUnavailableError) {
+        // Qdrantバックエンドが利用できない場合の詳細メッセージ
+        return {
+          content: [
+            {
+              type: 'text' as const,
+              text: `## RAG検索が利用できません\n\nクエリ: **${params.query}**\n\n` +
+                    `⚠️ **セマンティック検索機能が現在利用できません**\n\n` +
+                    `**理由:** ${error.context?.error || 'Qdrantベクターデータベースに接続できません'}\n\n` +
+                    `**対処方法:**\n` +
+                    `• Qdrantサーバーが起動していることを確認してください\n` +
+                    `• 設定ファイルの接続情報が正しいことを確認してください\n` +
+                    `• 代わりに \`search_settings_files\` または \`search_content_files\` ツールをお試しください（キーワード検索）`,
+            },
+          ],
+        };
+      }
+      
+      // その他のエラー
       const errorMsg = error instanceof Error ? error.message : 'Unknown error occurred';
       return {
         content: [{ type: 'text' as const, text: `RAG検索エラー: ${errorMsg}` }],
